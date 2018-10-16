@@ -31,7 +31,7 @@ catkin_package(
 #############
 
 install(PROGRAMS
-   scripts/ik_pick_and_place_demo.py
+   scripts/learning_env.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

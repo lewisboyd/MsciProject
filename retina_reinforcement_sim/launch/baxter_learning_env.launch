@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+
+  <!-- Resume the logic in baxter_world.launch -->
+  <include file="$(find baxter_gazebo)/launch/baxter_world.launch"/>
+
+  <!-- Start the learning environment -->
+  <node pkg="retina_reinforcement_sim" type="learning_env.py"
+    name="learning_env" />
+
+</launch>
