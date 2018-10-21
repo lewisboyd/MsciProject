@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import math
 from threading import Thread
 from threading import Event
 from Queue import Queue
@@ -42,98 +43,138 @@ import cortex_cuda
 import retina
 import cortex
 
+class Trainer(Thread):
 
-class ImageProcessor(Thread):
-    '''Threaded class to processes the ROS image data
 
-    Attributes:
-        retina (object): CUDA enhanced retina
-        cortex (object): CUDA enhanced cortex
-        image_queue (object): Thread safe queue shared with CameraListener
-        processing_event (object): Event used to signal when need more data
-        bridge (object): CvBridge to convert ROS image data to OpenCV image
-    '''
-
-    def __init__(self, ret, cort, image_queue, processing_event):
+    def __init__(self, episodes=100):
         Thread.__init__(self)
-        self.retina = ret
-        self.cortex = cort
-        self.image_queue = image_queue
-        self.processing_event = processing_event
-        self.bridge = CvBridge()
+        self.curr_episode = 0
+        self.episodes = episodes
+        self.cortical_image = np.zeros((246, 468, 3))
+        self.curr_dist_from_centre = 0
+        self.prev_dist_from_centre = 0
+
+        print "Starting the CameraListener..."
+        self.image_queue = Queue(1)
+        self.ready_for_data_event = Event()
+        CameraListener(self.image_queue, self.ready_for_data_event)
+
+        print "Creating the ImageProcessor..."
+        ret, cort = create_retina_and_cortex()
+        self.image_processor = ImageProcessor(ret, cort)
 
     def run(self):
-        '''Processes the image data when the processing_event is set to true
-        '''
-        while True:
-            self.processing_event.wait()
-            image_data = self.image_queue.get()
-            self.process_image(image_data)
-            self.processing_event.clear()
+        # While still training
+        while self.curr_episode < self.episodes:
+            print "Episode {}/{}".format(self.curr_episode, self.episodes)
 
-    def process_image(self, image_data):
-        try:
-            print "Processing image"
-            # Convert to cv image
-            cv_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
+            # Move ball location
+            #
 
-            # Sample with retina
-            cortical_image = self.retina_sample(cv_image)
+            # Move arm back to start position
+            move_to_start_position()
 
-            # Display the cortical image
-            cv2.namedWindow("Retina Feed", cv2.WINDOW_NORMAL)
-            cv2.imshow("Retina Feed", cortical_image)
+            # Populate initial cortical_image and prev_dist_from_centre
+            self.process_initial_image()
 
-            # Obtain mask of the image
-            mask = self.create_mask(cv_image)
+            print "distance {}".format(self.prev_dist_from_centre)
+            cv2.namedWindow("feed", cv2.WINDOW_NORMAL)
+            cv2.imshow("feed", self.cortical_image)
+            cv2.waitKey(1000)
 
-            # Display the mask
-            cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
-            cv2.imshow("Mask", mask)
+            # Runs until DQN uses found centre_move
+            i = 0
+            while True:
+                # DQN makes move using cortical_image input
+                i = i + 1
 
-            # Obtain mask of the cortical image
-            mask = self.create_mask(cortical_image)
-
-            # Display the mask
-            cv2.namedWindow("Cortical Mask", cv2.WINDOW_NORMAL)
-            cv2.imshow("Cortical Mask", mask)
-
-            # Small wait else images will not display
-            print "Waiting"
-            cv2.waitKey(5000)
-
-            if self.start:
-                print "Moving to start"
-                move_to_start_position()
-                self.start = False
-            else:
-                print "Moving"
                 starting_joint_angles = {'left_w0': 1.58,
-                                         'left_w1': 1,
+                                         'left_w1': 0.1,
                                          'left_w2': -1.58,
                                          'left_e0': 0,
-                                         'left_e1': 0.7,
+                                         'left_e1': 0.68,
                                          'left_s0': -0.8,
                                          'left_s1': -0.8}
                 baxter_interface.Limb('left').move_to_joint_positions(
                     starting_joint_angles,
                     threshold=0.004)
-                self.start = True
-            print "Finished move"
-        except Exception as e:
-            # Print error
-            print e.message
 
-    def retina_sample(self, image):
-        '''Samples with the retina returning the cortical image
+                # Update cortical_image and get curr_dist_from_centre
+                self.process_image()
+                print "distance {}".format(self.curr_dist_from_centre)
+                cv2.imshow("feed", self.cortical_image)
+                cv2.waitKey(1000)
+
+                # Evaluate move by DQN, if found centre move used then break
+                if (i == 3):
+                    break
+
+            # Episode finished when found_centre is used
+            self.curr_episode = self.curr_episode + 1
+
+    def process_initial_image(self):
+        self.ready_for_data_event.set()
+        image_data = self.image_queue.get()
+        self.cortical_image, self.prev_dist_from_centre = self.image_processor.process_image(image_data)
+
+    def process_image(self):
+        self.ready_for_data_event.set()
+        image_data = self.image_queue.get()
+        self.cortical_image, self.curr_dist_from_centre = self.image_processor.process_image(image_data)
+
+
+
+class ImageProcessor:
+    '''Class to processes the ROS image data
+
+    Attributes:
+        retina (object): CUDA enhanced retina
+        cortex (object): CUDA enhanced
+        bridge (object): CvBridge to convert ROS image data to OpenCV image
+    '''
+
+    def __init__(self, ret, cort):
+        self.retina = ret
+        self.cortex = cort
+        self.bridge = CvBridge()
+        self.image = np.zeros((1080, 1920, 3))
+        self.cortical_image = np.zeros((246, 468, 3))
+        self.image_mask = np.zeros((1080, 1920))
+        self.dist_from_centre = 0
+
+    def process_image(self, image_data):
+        '''Creates the cortical image and calculates the distance of the ball
+        to the centre of the image
 
         Args:
-            image (object): BGR OpenCV image
+            image_data (object): The ROS image message
+
+        Returns:
+            object: The cortical image
+            float: The distance of the ball to the centre of the image
+        '''
+        # Convert to OpenCV image
+        self.image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
+
+        # Sample with retina
+        self.cortical_image = self.retina_sample()
+
+        # Obtain mask of the image
+        self.image_mask = self.create_mask(self.image)
+
+        # Calculate distance of ball from centre of camera
+        self.calc_dist_from_centre()
+
+        print "ImageProcessor distance {}".format(self.dist_from_centre)
+        return self.cortical_image, self.dist_from_centre
+
+    def retina_sample(self):
+        '''Samples with the retina returning the cortical image
 
         Returns:
             object: The cortical image
         '''
-        v_c = self.retina.sample(image)
+        v_c = self.retina.sample(self.image)
         l_c = self.cortex.cort_image_left(v_c)
         r_c = self.cortex.cort_image_right(v_c)
         c_c = np.concatenate((np.rot90(l_c),np.rot90(r_c,k=3)),axis=1)
@@ -159,35 +200,47 @@ class ImageProcessor(Thread):
         # Return the mask
         return mask
 
+    def calc_dist_from_centre(self):
+        ''' Calculates the distance from the centre of the image to the centre
+        of the ball
+        '''
+        moments = cv2.moments(self.image_mask)
+        x_centre = int(moments["m10"] / moments["m00"])
+        y_centre = int(moments["m01"] / moments["m00"])
+        x_dist = 960 - x_centre
+        y_dist = 540 - y_centre
+        self.dist_from_centre = math.sqrt((x_dist ** 2) + (y_dist ** 2))
 
-class Listener:
+class CameraListener:
     '''Class to handle ROS image data
 
     Attributes:
-        image_queue (object): Thread safe queue shared with ImageProcessor
-        processing_event (object): Event used to signal if ImageProcessor is
-            processing
+        image_queue (object): Thread safe queue used to send data when
+            requested
+        ready_for_data_event (object): Event to signal if image_queue needs to
+            be populated
         sub (object): Subscription to Baxter's left arm camera topic
     '''
 
-    def __init__(self, image_queue, processing_event):
+    def __init__(self, image_queue, ready_for_data_event):
         self.image_queue = image_queue
-        self.processing_event = processing_event
+        self.ready_for_data_event = ready_for_data_event
         self.sub = rospy.Subscriber("/cameras/left_hand_camera/image", Image,
                                     self.callback, queue_size=1,
                                     buff_size=20000000)
 
     def callback(self, image_data):
-        '''Callback function to give ImageProcessor most up to date image data
+        '''Callback function to populate image_queue when ready_for_data_event
+        is set
 
         Args:
             image_data (object): ROS image data
         '''
-        if self.processing_event.is_set():
-            return
-        else:
+        if self.ready_for_data_event.is_set():
             self.image_queue.put(image_data)
-            self.processing_event.set()
+            self.ready_for_data_event.clear()
+        else:
+            return
 
 
 def create_retina_and_cortex():
@@ -265,7 +318,7 @@ def move_to_start_position():
                              'left_w1': 0,
                              'left_w2': -1.58,
                              'left_e0': 0,
-                             'left_e1': 0.7,
+                             'left_e1': 0.68,
                              'left_s0': -0.8,
                              'left_s1': -0.8}
     baxter_interface.Limb('left').move_to_joint_positions(
@@ -287,18 +340,12 @@ def main():
     print "Moving to start pose..."
     move_to_start_position()
 
-    print "Starting the ImageProcessor..."
-    image_queue = Queue(1)
-    processing_event = Event()
-    ret, cort = create_retina_and_cortex()
-    image_processor = ImageProcessor(ret, cort, image_queue, processing_event)
-    image_processor.daemon = True
-    image_processor.start()
+    print "Creating the trainer"
+    trainer = Trainer()
+    trainer.daemon = True
 
-    print "Starting the CameraListener..."
-    Listener(image_queue, processing_event)
-
-    print "Running, press ctrl-c to exit..."
+    print "Starting the trainer, press ctrl-c to exit..."
+    trainer.start()
     rospy.spin()
 
 
