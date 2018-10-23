@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-import sys
 import cortex
 import cortex_cuda
 import retina_cuda
+import sys
+from collections import namedtuple
 import math
 from time import sleep
-from random import random
+import random
 from threading import Thread
 from threading import Event
 from Queue import Queue
@@ -16,9 +17,6 @@ import rospkg
 import baxter_interface
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-import cv2
-import numpy as np
-import cPickle as pickle
 from gazebo_msgs.srv import (
     SpawnModel,
     DeleteModel,
@@ -30,6 +28,60 @@ from geometry_msgs.msg import (
     Point,
 )
 from std_msgs.msg import Empty
+import cv2
+import numpy as np
+import cPickle as pickle
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import torchvision.transforms as T
+
+
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
+
+
+class DQN(nn.Module):
+
+    def __init__(self):
+        super(DQN, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, 8, 4)
+        self.conv2 = nn.Conv2d(32, 64, 4, 2)
+        self.conv3 = nn.Conv2d(64, 64, 3, 1)
+        self.fc1 = nn.Linear(95040, 512)
+        self.head = nn.Linear(512, 3)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(1, 95040)
+        x = F.relu(self.fc1(x))
+        x = self.head(x)
+        return x
+
+
+class ReplayMemory(object):
+
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
+
+    def push(self, *args):
+        """Saves a transition."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = Transition(*args)
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
 
 
 class Trainer(Thread):
@@ -57,6 +109,14 @@ class Trainer(Thread):
         self.cortical_image = np.zeros((246, 468, 3))
         self.image_processor = ImageProcessor()
 
+        print "Loading the DQN..."
+        self.dqn = DQN()
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu"
+        )
+        self.dqn.to(self.device)
+        print "Loaded DQN on {}".format(self.device)
+
     def run(self):
         '''Threads run method to run the training
         '''
@@ -69,6 +129,11 @@ class Trainer(Thread):
             self.initialize_episode()
             while not self.ball_visible():
                 self.initialize_episode()
+
+            tensor = T.ToTensor()(self.cortical_image).unsqueeze(0).to(self.device)
+            print tensor.size()
+
+            print self.dqn.forward(tensor)
 
             # Runs until DQN uses found centre_move
             # while True:
@@ -97,10 +162,6 @@ class Trainer(Thread):
         self.process_image_data()
         self.prev_dist = self.image_processor.calc_dist(self.image)
 
-    def ball_visible(self):
-        '''Returns True if ball is not visible'''
-        return self.prev_dist == -1
-
     def process_image_data(self):
         '''Gets latest wrist image updating cortical_image and image
         '''
@@ -109,6 +170,10 @@ class Trainer(Thread):
         self.image, self.cortical_image = (
             self.image_processor.process_image_data(image_data)
         )
+
+    def ball_visible(self):
+        '''Returns True if ball is visible'''
+        return self.prev_dist != -1
 
 
 class ImageProcessor:
@@ -255,8 +320,8 @@ def move_ball_location():
     '''Moves the ball to a random position within the retinas field of view
     '''
     # Generate random y and z locations
-    a = random() * 2 * math.pi
-    r = 0.4 * math.sqrt(random())
+    a = random.random() * 2 * math.pi
+    r = 0.4 * math.sqrt(random.random())
     y_loc = 0.235 + (r * math.cos(a))
     z_loc = 1.2 + (r * math.sin(a))
 
@@ -347,7 +412,7 @@ def main():
     print "Moving to start pose..."
     move_to_start_position()
 
-    print "Creating the trainer"
+    print "Creating the trainer..."
     trainer = Trainer()
     trainer.setDaemon(True)
 
