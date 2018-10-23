@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
 import sys
+import cortex
+import cortex_cuda
+import retina_cuda
 import math
+from time import sleep
+from random import random
 from threading import Thread
 from threading import Event
 from Queue import Queue
@@ -9,50 +14,38 @@ from Queue import Queue
 import rospy
 import rospkg
 import baxter_interface
-from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import scipy
 import cPickle as pickle
 from gazebo_msgs.srv import (
     SpawnModel,
     DeleteModel,
+    SetModelState,
 )
+from gazebo_msgs.msg import ModelState
 from geometry_msgs.msg import (
-    PoseStamped,
     Pose,
     Point,
-    Quaternion,
 )
-from std_msgs.msg import (
-    Header,
-    Empty,
-)
-from baxter_core_msgs.srv import (
-    SolvePositionIK,
-    SolvePositionIKRequest,
-)
+from std_msgs.msg import Empty
 
-sys.path.append('/home/lewis/Downloads/RetinaCUDA-master/py')
-sys.path.append(
-    '/home/lewis/Downloads/RetinaCUDA-master/py/Piotr_Ozimek_retina')
-import retina_cuda
-import cortex_cuda
-import retina
-import cortex
 
 class Trainer(Thread):
+    '''Threaded class to train the DQN
 
+    Args:
+        episodes: number of episodes to train for
+    '''
 
     def __init__(self, episodes=100):
         Thread.__init__(self)
         self.curr_episode = 0
         self.episodes = episodes
         self.cortical_image = np.zeros((246, 468, 3))
-        self.curr_dist_from_centre = 0
-        self.prev_dist_from_centre = 0
+        self.curr_dist = 0
+        self.prev_dist = 0
 
         print "Starting the CameraListener..."
         self.image_queue = Queue(1)
@@ -60,68 +53,62 @@ class Trainer(Thread):
         CameraListener(self.image_queue, self.ready_for_data_event)
 
         print "Creating the ImageProcessor..."
-        ret, cort = create_retina_and_cortex()
-        self.image_processor = ImageProcessor(ret, cort)
+        self.image = np.zeros((1080, 1920, 3))
+        self.cortical_image = np.zeros((246, 468, 3))
+        self.image_processor = ImageProcessor()
 
     def run(self):
+        '''Threads run method to run the training
+        '''
         # While still training
         while self.curr_episode < self.episodes:
             print "Episode {}/{}".format(self.curr_episode, self.episodes)
 
-            # Move ball location
-            #
-
-            # Move arm back to start position
-            move_to_start_position()
-
-            # Populate initial cortical_image and prev_dist_from_centre
-            self.process_initial_image()
-
-            print "distance {}".format(self.prev_dist_from_centre)
-            cv2.namedWindow("feed", cv2.WINDOW_NORMAL)
-            cv2.imshow("feed", self.cortical_image)
-            cv2.waitKey(1000)
+            # Position the ball and process initial image data
+            # Ball may be hidden behind gripper so reposition till visible
+            self.initialize_episode()
+            while not self.ball_visible():
+                self.initialize_episode()
 
             # Runs until DQN uses found centre_move
-            i = 0
-            while True:
-                # DQN makes move using cortical_image input
-                i = i + 1
-
-                starting_joint_angles = {'left_w0': 1.58,
-                                         'left_w1': 0.1,
-                                         'left_w2': -1.58,
-                                         'left_e0': 0,
-                                         'left_e1': 0.68,
-                                         'left_s0': -0.8,
-                                         'left_s1': -0.8}
-                baxter_interface.Limb('left').move_to_joint_positions(
-                    starting_joint_angles,
-                    threshold=0.004)
-
-                # Update cortical_image and get curr_dist_from_centre
-                self.process_image()
-                print "distance {}".format(self.curr_dist_from_centre)
-                cv2.imshow("feed", self.cortical_image)
-                cv2.waitKey(1000)
-
-                # Evaluate move by DQN, if found centre move used then break
-                if (i == 3):
-                    break
+            # while True:
+            #     # DQN makes move using cortical_image input
+            #
+            #     # Get the wrist image and cortical image
+            #     self.process_image_data()
+            #
+            #     # Calculate the pixel distance
+            #     self.curr_dist = self.image_processor.calc_dist(self.image)
+            #
+            #     # Evaluate move by DQN, if found centre move used then break
+            #
+            #     # Update previous pixel distance
+            #     self.prev_dist = self.curr_dist
 
             # Episode finished when found_centre is used
             self.curr_episode = self.curr_episode + 1
 
-    def process_initial_image(self):
+    def initialize_episode(self):
+        '''Positions the ball and processes initial image data'''
+
+        move_ball_location()
+        sleep(1)  # Wait to ensure camera image is up to date
+        move_to_start_position()
+        self.process_image_data()
+        self.prev_dist = self.image_processor.calc_dist(self.image)
+
+    def ball_visible(self):
+        '''Returns True if ball is not visible'''
+        return self.prev_dist == -1
+
+    def process_image_data(self):
+        '''Gets latest wrist image updating cortical_image and image
+        '''
         self.ready_for_data_event.set()
         image_data = self.image_queue.get()
-        self.cortical_image, self.prev_dist_from_centre = self.image_processor.process_image(image_data)
-
-    def process_image(self):
-        self.ready_for_data_event.set()
-        image_data = self.image_queue.get()
-        self.cortical_image, self.curr_dist_from_centre = self.image_processor.process_image(image_data)
-
+        self.image, self.cortical_image = (
+            self.image_processor.process_image_data(image_data)
+        )
 
 
 class ImageProcessor:
@@ -129,20 +116,15 @@ class ImageProcessor:
 
     Attributes:
         retina (object): CUDA enhanced retina
-        cortex (object): CUDA enhanced
+        cortex (object): CUDA enhanced cortex
         bridge (object): CvBridge to convert ROS image data to OpenCV image
     '''
 
-    def __init__(self, ret, cort):
-        self.retina = ret
-        self.cortex = cort
+    def __init__(self):
+        self.retina, self.cortex = self._create_retina_and_cortex()
         self.bridge = CvBridge()
-        self.image = np.zeros((1080, 1920, 3))
-        self.cortical_image = np.zeros((246, 468, 3))
-        self.image_mask = np.zeros((1080, 1920))
-        self.dist_from_centre = 0
 
-    def process_image(self, image_data):
+    def process_image_data(self, image_data):
         '''Creates the cortical image and calculates the distance of the ball
         to the centre of the image
 
@@ -154,62 +136,88 @@ class ImageProcessor:
             float: The distance of the ball to the centre of the image
         '''
         # Convert to OpenCV image
-        self.image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
+        image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
 
         # Sample with retina
-        self.cortical_image = self.retina_sample()
+        cortical_image = self._retina_sample(image)
 
-        # Obtain mask of the image
-        self.image_mask = self.create_mask(self.image)
+        return image, cortical_image,
 
-        # Calculate distance of ball from centre of camera
-        self.calc_dist_from_centre()
+    def calc_dist(self, image):
+        ''' Calculates distance from image centre to ball centre
 
-        print "ImageProcessor distance {}".format(self.dist_from_centre)
-        return self.cortical_image, self.dist_from_centre
+        Args:
+            image: image to find ball in
 
-    def retina_sample(self):
+        Returns:
+            distance of ball to centre of image, or -1 if unsuccessful
+        '''
+        moments = cv2.moments(self._create_mask(image))
+        if (moments["m00"] == 0):
+            return -1
+        x_centre = int(moments["m10"] / moments["m00"])
+        y_centre = int(moments["m01"] / moments["m00"])
+        x_dist = 960 - x_centre
+        y_dist = 540 - y_centre
+        return int(math.sqrt((x_dist ** 2) + (y_dist ** 2)))
+
+    def _retina_sample(self, image):
         '''Samples with the retina returning the cortical image
 
         Returns:
-            object: The cortical image
+            The cortical image
         '''
-        v_c = self.retina.sample(self.image)
+        v_c = self.retina.sample(image)
         l_c = self.cortex.cort_image_left(v_c)
         r_c = self.cortex.cort_image_right(v_c)
-        c_c = np.concatenate((np.rot90(l_c),np.rot90(r_c,k=3)),axis=1)
-        return c_c
+        return np.concatenate((np.rot90(l_c), np.rot90(r_c, k=3)), axis=1)
 
-    def create_mask(self, image):
+    def _create_mask(self, image):
         '''Processes the image to obtain a binary mask showing the ball
 
         Args:
-            image (object): BGR OpenCV image
+            image: BGR OpenCV image
 
         Returns:
-            object: Binary mask
+            Binary mask
         '''
         # Define lower and upper colour bounds
-        ORANGE_MIN = np.array([5, 50, 50],np.uint8)
-        ORANGE_MAX = np.array([15, 255, 255],np.uint8)
+        ORANGE_MIN = np.array([5, 50, 50], np.uint8)
+        ORANGE_MAX = np.array([15, 255, 255], np.uint8)
 
         # Threshold the image in the HSV colour space
-        hsv_image = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv_image, ORANGE_MIN, ORANGE_MAX)
 
         # Return the mask
         return mask
 
-    def calc_dist_from_centre(self):
-        ''' Calculates the distance from the centre of the image to the centre
-        of the ball
+    def _create_retina_and_cortex(self):
+        '''Creates the retina and cortex
+
+        Returns:
+            The CUDA enhanced Retina and Cortex
         '''
-        moments = cv2.moments(self.image_mask)
-        x_centre = int(moments["m10"] / moments["m00"])
-        y_centre = int(moments["m01"] / moments["m00"])
-        x_dist = 960 - x_centre
-        y_dist = 540 - y_centre
-        self.dist_from_centre = math.sqrt((x_dist ** 2) + (y_dist ** 2))
+        # Load in data
+        retina_path = '/home/lewis/Downloads/RetinaCUDA-master/Retinas'
+        with open(retina_path + '/ret50k_loc.pkl', 'rb') as handle:
+            loc50k = pickle.load(handle)
+        with open(retina_path + '/ret50k_coeff.pkl', 'rb') as handle:
+            coeff50k = pickle.load(handle)
+
+        # Create retina and cortex
+        L, R = cortex.LRsplit(loc50k)
+        L_loc, R_loc = cortex.cort_map(L, R)
+        L_loc, R_loc, G, cort_size = cortex.cort_prepare(L_loc, R_loc)
+        ret = retina_cuda.create_retina(loc50k, coeff50k,
+                                        (1080, 1920, 3), (960, 540))
+        cort = cortex_cuda.create_cortex_from_fields_and_locs(
+            L, R, L_loc, R_loc, cort_size, gauss100=G, rgb=True
+        )
+
+        # Return the retina and cortex
+        return ret, cort
+
 
 class CameraListener:
     '''Class to handle ROS image data
@@ -234,7 +242,7 @@ class CameraListener:
         is set
 
         Args:
-            image_data (object): ROS image data
+            image_data: ROS image data
         '''
         if self.ready_for_data_event.is_set():
             self.image_queue.put(image_data)
@@ -243,53 +251,52 @@ class CameraListener:
             return
 
 
-def create_retina_and_cortex():
-    '''Creates the retina and cortex
-
-    Returns:
-        object: The CUDA enhanced Retina
-        object: The CUDA enhanced Cortex
+def move_ball_location():
+    '''Moves the ball to a random position within the retinas field of view
     '''
-    # Load in data
-    retina_path = '/home/lewis/Downloads/RetinaCUDA-master/Retinas'
-    mat_data = '/home/lewis/Downloads/RetinaCUDA-master/Retinas'
-    with open(retina_path + '/ret50k_loc.pkl', 'rb') as handle:
-        loc50k = pickle.load(handle)
-    with open(retina_path + '/ret50k_coeff.pkl', 'rb') as handle:
-        coeff50k = pickle.load(handle)
+    # Generate random y and z locations
+    a = random() * 2 * math.pi
+    r = 0.4 * math.sqrt(random())
+    y_loc = 0.235 + (r * math.cos(a))
+    z_loc = 1.2 + (r * math.sin(a))
 
-    # Create retina and cortex
-    L, R = cortex.LRsplit(loc50k)
-    L_loc, R_loc = cortex.cort_map(L, R)
-    L_loc, R_loc, G, cort_size = cortex.cort_prepare(L_loc, R_loc)
-    ret = retina_cuda.create_retina(loc50k, coeff50k,
-        (1080, 1920, 3), (960, 540))
-    cort = cortex_cuda.create_cortex_from_fields_and_locs(L, R, L_loc,
-        R_loc, cort_size, gauss100=G, rgb=True)
+    # Create ModelState message
+    ball_pose = Pose(position=Point(x=2, y=y_loc, z=z_loc))
+    model_state = ModelState(
+        model_name='ball', pose=ball_pose, reference_frame="world"
+    )
 
-    # Return the retina and cortex
-    return ret, cort
+    # Attempt to move ball
+    rospy.wait_for_service('/gazebo/set_model_state')
+    try:
+        set_model_state = rospy.ServiceProxy(
+            '/gazebo/set_model_state', SetModelState
+        )
+        set_model_state(model_state)
+    except rospy.ServiceException, e:
+        rospy.logerr("Set Model State service call failed: {0}".format(e))
 
 
 def load_gazebo_models():
     '''Loads in the models via the Spawning service
     '''
     # Get Models' Path
-    model_path = rospkg.RosPack().get_path('retina_reinforcement_sim')+"/models/"
+    model_path = (
+        rospkg.RosPack().get_path('retina_reinforcement_sim') + "/models/"
+    )
 
     # Load ball SDF
     ball_xml = ''
-    with open (model_path + "simple_ball/model.sdf", "r") as ball_file:
-        ball_xml=ball_file.read().replace('\n', '')
+    with open(model_path + "simple_ball/model.sdf", "r") as ball_file:
+        ball_xml = ball_file.read().replace('\n', '')
 
     # Spawn ball SDF
     rospy.wait_for_service('/gazebo/spawn_sdf_model')
     try:
-        pose = Pose(position=Point(x=2, y=0.235, z=1.186))
+        pose = Pose(position=Point(x=2, y=0.235, z=1.2))
         reference_frame = "world"
         spawn_sdf = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
-        resp_sdf = spawn_sdf("ball", ball_xml, "/",
-                             pose, reference_frame)
+        spawn_sdf("ball", ball_xml, "/", pose, reference_frame)
     except rospy.ServiceException, e:
         rospy.logerr("Spawn SDF service call failed: {0}".format(e))
 
@@ -299,7 +306,7 @@ def delete_gazebo_models():
     '''
     try:
         delete_model = rospy.ServiceProxy('/gazebo/delete_model', DeleteModel)
-        resp_delete = delete_model("ball")
+        delete_model("ball")
     except rospy.ServiceException, e:
         rospy.loginfo("Model service call failed: {0}".format(e))
 
@@ -342,9 +349,9 @@ def main():
 
     print "Creating the trainer"
     trainer = Trainer()
-    trainer.daemon = True
+    trainer.setDaemon(True)
 
-    print "Starting the trainer, press ctrl-c to exit..."
+    print "Training started, press ctrl-c to exit..."
     trainer.start()
     rospy.spin()
 
