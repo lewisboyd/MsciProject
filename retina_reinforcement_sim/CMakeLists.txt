@@ -8,10 +8,11 @@ find_package(catkin REQUIRED COMPONENTS
   baxter_gazebo
   baxter_interface
   baxter_tools
-  baxter_tools
   gazebo_ros
   gazebo_msgs
 )
+
+catkin_python_setup()
 
 catkin_package(
   CATKIN_DEPENDS
@@ -20,7 +21,6 @@ catkin_package(
   baxter_core_msgs
   baxter_gazebo
   baxter_interface
-  baxter_tools
   baxter_tools
   gazebo_ros
   gazebo_msgs
@@ -31,7 +31,7 @@ catkin_package(
 #############
 
 install(PROGRAMS
-   scripts/learning_env.py
+   scripts/test.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

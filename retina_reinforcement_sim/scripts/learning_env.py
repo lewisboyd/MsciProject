@@ -42,22 +42,42 @@ Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 
-class DQN(nn.Module):
+class Actor(nn.Module):
 
     def __init__(self):
-        super(DQN, self).__init__()
-
+        super(Actor, self).__init__()
         self.conv1 = nn.Conv2d(3, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
         self.conv3 = nn.Conv2d(64, 64, 3, 1)
         self.fc1 = nn.Linear(95040, 512)
         self.head = nn.Linear(512, 3)
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
+    def forward(self, image):
+        x = F.relu(self.conv1(image))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
         x = x.view(1, 95040)
+        x = F.relu(self.fc1(x))
+        x = self.head(x)
+        return x
+
+
+class Critic(nn.Module):
+
+    def __init__(self):
+        super(Critic, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, 8, 4)
+        self.conv2 = nn.Conv2d(32, 64, 4, 2)
+        self.conv3 = nn.Conv2d(64, 64, 3, 1)
+        self.fc1 = nn.Linear(95043, 512)
+        self.head = nn.Linear(512, 1)
+
+    def forward(self, image, action):
+        x = F.relu(self.conv1(image))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(1, 95040)
+        x = torch.cat((x, action))
         x = F.relu(self.fc1(x))
         x = self.head(x)
         return x
@@ -84,6 +104,38 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
+class ActorCritic():
+
+    def __init__(self):
+        self.EPS_START = 0.9
+        self.EPS_END = 0.05
+        self.EPS_DECAY = 200
+        self.steps_done = 0
+
+        self.actor = Actor()
+        self·actor_target = Actor()
+        self.critic = Critic()
+        self.critic_target = Critic()
+        self.memory = ReplayMemory(1000)
+
+    def calc_move(self, cortical_image):
+        '''Actor decides a move or a random move is made
+        '''
+
+        sample = random.random()
+        eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * \
+            math.exp(-1. * self.steps_done / self.EPS_DECAY)
+        self.steps_done += 1
+        if sample > eps_threshold:
+            with torch.no_grad():
+                return self.actor(cortical_image)
+        else:
+            return torch.tensor([[random.uniform(0.5, 1.25),
+                                  random.uniform(-2, 2),
+                                  random.uniform(-2, 2)]], device=self.device,
+                                dtype=torch.long)
+
+
 class Trainer(Thread):
     '''Threaded class to train the DQN
 
@@ -93,11 +145,18 @@ class Trainer(Thread):
 
     def __init__(self, episodes=100):
         Thread.__init__(self)
-        self.curr_episode = 0
         self.episodes = episodes
-        self.cortical_image = np.zeros((246, 468, 3))
+        self.EPS_START = 0.9
+        self.EPS_END = 0.05
+        self.EPS_DECAY = 200
+        self.steps_done = 0
+        self.memory = ReplayMemory(1000)
+        self.prev_cortical_image = np.zeros((246, 468, 3))
+        self.curr_cortical_image = np.zeros((246, 468, 3))
         self.curr_dist = 0
         self.prev_dist = 0
+        self.threshold = 50
+        self.left_arm = baxter_interface.Limb('left')
 
         print "Starting the CameraListener..."
         self.image_queue = Queue(1)
@@ -106,49 +165,59 @@ class Trainer(Thread):
 
         print "Creating the ImageProcessor..."
         self.image = np.zeros((1080, 1920, 3))
-        self.cortical_image = np.zeros((246, 468, 3))
         self.image_processor = ImageProcessor()
 
-        print "Loading the DQN..."
-        self.dqn = DQN()
+        print "Loading the Networks..."
+        self.actor = Actor()
+        self.critic = Critic()
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu"
         )
-        self.dqn.to(self.device)
-        print "Loaded DQN on {}".format(self.device)
+        self.actor.to(self.device)
+        self.critic.to(self.device)
+        print "Loaded Networks on {}".format(self.device)
 
     def run(self):
         '''Threads run method to run the training
         '''
         # While still training
-        while self.curr_episode < self.episodes:
-            print "Episode {}/{}".format(self.curr_episode, self.episodes)
+        for curr_episode in self.episodes:
+            print "Episode {}/{}".format(curr_episode, self.episodes)
 
             # Position the ball and process initial image data
-            # Ball may be hidden behind gripper so reposition till visible
             self.initialize_episode()
-            while not self.ball_visible():
-                self.initialize_episode()
-
-            tensor = T.ToTensor()(self.cortical_image).unsqueeze(0).to(self.device)
-            print tensor.size()
-
-            print self.dqn.forward(tensor)
 
             # Runs until DQN uses found centre_move
-            # while True:
-            #     # DQN makes move using cortical_image input
-            #
-            #     # Get the wrist image and cortical image
-            #     self.process_image_data()
-            #
-            #     # Calculate the pixel distance
-            #     self.curr_dist = self.image_processor.calc_dist(self.image)
-            #
-            #     # Evaluate move by DQN, if found centre move used then break
-            #
-            #     # Update previous pixel distance
-            #     self.prev_dist = self.curr_dist
+            while True:
+                # Calculate move to make
+                move_values = self.calc_move()
+
+                # Execute the move
+                self.execute_move(move_values)
+
+                # Get the wrist image and cortical image
+                self.process_image_data()
+
+                # Calculate the pixel distance
+                self.curr_dist = self.image_processor.calc_dist(self.image)
+
+                # If move cause sight of ball to be lost then end the episode
+                if self.curr_dist == -1:
+                    break
+
+                # Evaluate move
+                reward = self.evaluate_move(move_values)
+
+                # Save transition in memory
+                self.memory.push(self.prev_cortical_image, move_values, reward,
+                                 self.curr_cortical_image)
+
+                # If found centre move used then end the episode
+                if move_values[0] >= 1:
+                    break
+
+                # Update previous pixel distance
+                self.prev_dist = self.curr_dist
 
             # Episode finished when found_centre is used
             self.curr_episode = self.curr_episode + 1
@@ -156,24 +225,85 @@ class Trainer(Thread):
     def initialize_episode(self):
         '''Positions the ball and processes initial image data'''
 
+        self.move_to_start_position()
         move_ball_location()
         sleep(1)  # Wait to ensure camera image is up to date
-        move_to_start_position()
         self.process_image_data()
         self.prev_dist = self.image_processor.calc_dist(self.image)
 
+        # Ball may be hidden behind gripper so reposition till visible
+        if self.prev_dist == -1:
+            self.initialize_episode()
+
+    def move_to_start_position(self):
+        '''Moves the arms joints back to their starting positions'''
+
+        starting_joint_angles = {'left_w0': 1.58,
+                                 'left_w1': 0,
+                                 'left_w2': -1.58,
+                                 'left_e0': 0,
+                                 'left_e1': 0.68,
+                                 'left_s0': -0.8,
+                                 'left_s1': -0.8}
+        self.left_arm.move_to_joint_positions(starting_joint_angles,
+                                              threshold=0.004)
+
     def process_image_data(self):
-        '''Gets latest wrist image updating cortical_image and image
+        '''Gets latest wrist image updating the image attributes
         '''
+
         self.ready_for_data_event.set()
         image_data = self.image_queue.get()
-        self.image, self.cortical_image = (
+        self.prev_cortical_image = self.curr_cortical_image
+        self.image, self.curr_cortical_image = (
             self.image_processor.process_image_data(image_data)
         )
 
-    def ball_visible(self):
-        '''Returns True if ball is visible'''
-        return self.prev_dist != -1
+    def calc_move(self):
+        '''Generates a random move or uses the DQN to calculate the move values
+        '''
+
+        sample = random.random()
+        eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * \
+            math.exp(-1. * self.steps_done / self.EPS_DECAY)
+        self.steps_done += 1
+        if sample > eps_threshold:
+            with torch.no_grad():
+                return self.dqn(self.curr_cortical_image)
+        else:
+            return torch.tensor([[random.uniform(0.5, 1.25),
+                                  random.uniform(-2, 2),
+                                  random.uniform(-2, 2)]], device=self.device,
+                                dtype=torch.long)
+
+    def execute_move(self, move_values):
+        '''Executes the move according to the given move values'''
+
+        # If found_centre_move used then ignore wrist and elbow move
+        if move_values[0] >= 1:
+            return
+
+        # Otherwise move the wrist and elbow joints
+        wrist_angle = self.left_arm.joint_angle('left_w1') + move_values[1]
+        elbow_angle = self.left_arm.joint_angle('left_e1') + move_values[2]
+        joint_angles = {'left_w1': wrist_angle,
+                        'left_e1': elbow_angle}
+        self.left_arm.move_to_joint_positions(
+            joint_angles,
+            threshold=0.004)
+
+    def evaluate_move(self, move_values):
+        '''Evaluates the choosen moves returning a reward'''
+
+        # If found_centre moved return big reward if within distance threshold
+        if move_values[0] >= 1:
+            if self.curr_dist < self.threshold:
+                return 3
+        # If closed distance to ball return a small reward
+        if self.curr_dist < self.prev_dist:
+            return 1
+        # Otherwise return a negative reward
+        return -1
 
 
 class ImageProcessor:
@@ -383,21 +513,6 @@ def shutdown():
     cv2.destroyAllWindows()
 
 
-def move_to_start_position():
-    '''Moves the arms joints back to their starting positions
-    '''
-    starting_joint_angles = {'left_w0': 1.58,
-                             'left_w1': 0,
-                             'left_w2': -1.58,
-                             'left_e0': 0,
-                             'left_e1': 0.68,
-                             'left_s0': -0.8,
-                             'left_s1': -0.8}
-    baxter_interface.Limb('left').move_to_joint_positions(
-        starting_joint_angles,
-        threshold=0.004)
-
-
 def main():
     print "Loading world..."
     rospy.init_node("learning_env")
@@ -408,9 +523,6 @@ def main():
     print "Enabling Baxter..."
     rs = baxter_interface.RobotEnable()
     rs.enable()
-
-    print "Moving to start pose..."
-    move_to_start_position()
 
     print "Creating the trainer..."
     trainer = Trainer()
