@@ -19,23 +19,30 @@ from geometry_msgs.msg import (
 
 
 class Environment:
-    """Class to represent the learning environment."""
+    """Class representing the learning environment."""
 
     def __init__(self):
+        """Load in environment and initialise state."""
         baxter_interface.RobotEnable().enable()
-        self.left_cam = CameraController()
-        self.left_arm = baxter_interface.Limb('left')
         self._load_gazebo_models()
 
         self.state = None
-        self.image = None
-        self.prev_dist = None
-        self.curr_dist = None
-        self.threshold = 50
-        self.max_dist = 600
+
+        self._left_cam = CameraController()
+        self._left_arm = baxter_interface.Limb('left')
+        self._max_dist = 600.0
+        self._threshold = 30
+        self._curr_dist = None
+        self._prev_dist = self._threshold
+        self._image = None
+        self._WRIST_LIMIT = 0.35
+        self._ELBOW_LIMIT = 0.26
 
     def reset(self):
         """Start a fresh episode.
+
+        Moves the ball to a random visible location and resets the
+        environment's state.
 
         Returns:
             object: New State
@@ -43,53 +50,83 @@ class Environment:
         """
         self._move_to_start_position()
         # Due to the gripper the ball may rarely be obscured
-        # Loops until ball can be seen (curr_dist is not -1)
-        self.curr_dist = -1
-        while (self.curr_dist == -1):
+        # Loops until ball can be seen (distance isn't -1)
+        visible = False
+        while not visible:
             self._move_ball_location()
             self._update_state()
-        self.prev_dist = self.threshold
+            visible = image_processor.calc_dist(self.state) != -1
+        self._prev_dist = self._threshold
         return self.state
 
-    def step(self, action):
-        """Execute the action and update the environment state.
+    def step(self, found_value, wrist_value, elbow_value):
+        """Execute the action.
 
-        Returns:
-            object: New State
-            float: Reward
-            boolean: Episode finished
+        If found_action is true then if the centre of the screen is within the
+        threshold distance to the ball's centre then the reward is 2 and the
+        episode is finished.
+
+        If found_action is false then moves the baxter robot's left arm wrist
+        and elbow by the given values.
+        If sight of the ball is lost then the reward is -1 and the episode is
+        finished.
+        If the distance to the ball's centre was less than the threshold value
+        before the move then the reward is -1.
+        Otherwise returns a positive reward scaling from 0 to 1 with the
+        distance to the ball's centre.
+
+        Args:
+            found_value (float) : If > 0 then executes found action
+            wrist_value (float) : If not found_action then moves wrist
+            elbow_value (float) : If not found_action then moves elbow
+
+        Return
+            object : New State
+            float : Reward
+            bool : Episode finished
 
         """
-        # If joint move, make move then update state
-
-        self._update_state()
-        return self.state, self._reward_joint_move(), (self.curr_dist != -1)
-
-        # If found centre move, if within threshold
+        found_action, wrist_action, elbow_action = (
+            self._parse_action_values(found_value, wrist_value, elbow_value))
+        if found_action:
+            return self._evaluate_found_action()
+        else:
+            self._move_arm(wrist_action, elbow_action)
+            self._update_state()
+            return self._evaluate_move_action()
 
     def shutdown(self):
-        """Shutdown environment cleanly."""
+        """Delete loaded models. To be called when node is shutting down."""
         self._delete_gazebo_models()
 
-    def _reward_joint_move(self):
-        if self.prev_dist < self.threshold:
-            return -1
-        if self.curr_dist == -1:
-            return -1
-        return 1 - (self.curr_dist / self.max_dist)
+    def _parse_action_values(self, found_value, wrist_value, elbow_value):
+        found_move = True if found_value > 0 else False
+        wrist_move = wrist_value * self._WRIST_LIMIT
+        elbow_move = elbow_value * self._ELBOW_LIMIT
+        return found_move, wrist_move, elbow_move
 
-    def _reward_found_move(self):
-        if (self.curr_dist < self.threshold):
-            return 2
-        return -1
+    def _evaluate_found_action(self):
+        if self._curr_dist < self._threshold:
+            return self.state, 2, True
+        else:
+            return self.state, -1, False
+
+    def _evaluate_move_action(self):
+        visible = image_processor.calc_dist(self.state) != -1
+        if not visible:
+            return self.state, -1, True
+        elif self._prev_dist < self._threshold:
+            return self.state, -1, False
+        else:
+            return self.state, 1.0 - (self._curr_dist / self._max_dist), False
 
     def _update_state(self):
         sleep(1)  # Small wait to ensure sensors up to date
-        image_data = self.left_cam.get_image_data()
-        self.image, self.state = (
+        image_data = self._left_cam.get_image_data()
+        self._image, self.state = (
             image_processor.process_image_data(image_data))
-        self.prev_dist = self.curr_dist
-        self.curr_dist = image_processor.calc_dist(self.image)
+        self._prev_dist = self._curr_dist
+        self._curr_dist = image_processor.calc_dist(self._image)
 
     def _move_to_start_position(self):
         starting_joint_angles = {'left_w0': 1.58,
@@ -99,8 +136,16 @@ class Environment:
                                  'left_e1': 0.68,
                                  'left_s0': -0.8,
                                  'left_s1': -0.8}
-        self.left_arm.move_to_joint_positions(starting_joint_angles,
-                                              threshold=0.004)
+        self._left_arm.move_to_joint_positions(starting_joint_angles,
+                                               threshold=0.004)
+
+    def _move_arm(self, wrist, elbow):
+        wrist_angle = self._left_arm.joint_angle('left_w1') + wrist
+        elbow_angle = self._left_arm.joint_angle('left_e1') + elbow
+        joint_angles = {'left_w1': wrist_angle,
+                        'left_e1': elbow_angle}
+        self._left_arm.move_to_joint_positions(
+            joint_angles, threshold=0.004)
 
     def _move_ball_location(self):
         # Generate random y and z locations

@@ -31,7 +31,8 @@ catkin_package(
 #############
 
 install(PROGRAMS
-   scripts/test.py
+   scripts/train_ddpg.py
+   scripts/test_environment.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
