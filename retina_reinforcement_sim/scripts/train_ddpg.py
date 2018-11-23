@@ -13,12 +13,12 @@ def train():
     rospy.init_node("trainer")
 
     env = Environment()
-    agent = DDPG(batch_size=32)
+    trainer = DDPG()
     save_model_path = (os.path.dirname(
         os.path.realpath(__file__)) + "/state_dicts/")
     save_fig_path = (os.path.dirname(os.path.realpath(__file__))
                      + "/results/")
-    total_episodes = 1000
+    total_episodes = 5000
     timesteps = 10
     avg_rewards = []
 
@@ -37,14 +37,13 @@ def train():
         while not rospy.is_shutdown() and timestep < timesteps:
             timestep += 1
 
-            action_values = agent.get_exploration_action(curr_state)
+            action = trainer.get_exploration_action(curr_state)
             next_state, reward, terminal_state = (
-                env.step(*action_values))
-            print "Took action : {}".format(action_values)
-            print "Got reward : {}".format(reward)
-            agent.memory.push(curr_state, action_values, next_state, [reward],
-                              [terminal_state])
-            agent.optimise()
+                env.step(*action))
+
+            trainer.memory.push(curr_state, action, next_state,
+                                [reward], [terminal_state])
+            trainer.optimise()
 
             curr_state = next_state
             reward_sum += reward
@@ -65,8 +64,8 @@ def train():
         plt.draw()
         plt.pause(0.01)
 
-        if (episode % 100 == 0):
-            agent.save(save_model_path, episode)
+        if (episode % 1000 == 0):
+            trainer.save(save_model_path, episode)
 
     plt.savefig(save_fig_path + "episodes_average_rewards.png")
 

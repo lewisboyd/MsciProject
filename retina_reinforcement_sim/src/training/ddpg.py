@@ -9,7 +9,7 @@ class DDPG:
     """Class responsible for network optimisation and deciding action."""
 
     def __init__(self, memory_capacity=1000, batch_size=32,
-                 noise_function=NormalActionNoise(0, 0.6, 3), init_noise=1.0,
+                 noise_function=NormalActionNoise(0, 0.8, 3), init_noise=1.0,
                  final_noise=0.0, exploration_len=1000):
         """Initialise networks, memory and training params.
 
@@ -43,6 +43,7 @@ class DDPG:
         self.batch_size = batch_size
         self.tau = 0.001
         self.discount = 0.99
+        self.iter = 0
 
     def get_exploration_action(self, state):
         """Get an action from the actor with added noise if in exploration.
@@ -86,7 +87,7 @@ class DDPG:
             next_state_batch, self.actor_target(next_state_batch))
         expected_q = reward_batch + self.discount * final_state_batch * next_q
         predicted_q = self.critic.forward(state_batch, action_batch)
-        critic_loss = (predicted_q - expected_q).pow(2).mean()
+        critic_loss = (expected_q - predicted_q).pow(2).mean()
         self.critic_optim.zero_grad()
         critic_loss.backward()
         self.critic_optim.step()
@@ -101,6 +102,12 @@ class DDPG:
         # Soft update
         self._soft_update(self.critic_target, self.critic)
         self._soft_update(self.actor_target, self.actor)
+
+        if self.iter % 100 == 0:
+            print('Iteration :- ', self.iter, ' Loss_actor :- ',
+                  actor_loss.data.cpu().numpy(), ' Loss_critic :- ',
+                  critic_loss.data.cpu().numpy())
+        self.iter += 1
 
     def save(self, path, episode):
         """Save the models weights.
