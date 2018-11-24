@@ -8,9 +8,9 @@ import torchvision.transforms as T
 class DDPG:
     """Class responsible for network optimisation and deciding action."""
 
-    def __init__(self, memory_capacity=1000, batch_size=32,
+    def __init__(self, memory_capacity=1000, batch_size=200,
                  noise_function=NormalActionNoise(0, 0.8, 3), init_noise=1.0,
-                 final_noise=0.0, exploration_len=1000):
+                 final_noise=0.02, exploration_len=1000):
         """Initialise networks, memory and training params.
 
         Args:
@@ -29,11 +29,11 @@ class DDPG:
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001)
 
-        device = torch.device("cuda:0")
-        self.actor.to(device)
-        self.actor_target.to(device)
-        self.critic.to(device)
-        self.critic_target.to(device)
+        self.device = torch.device("cuda:0")
+        self.actor.to(self.device)
+        self.actor_target.to(self.device)
+        self.critic.to(self.device)
+        self.critic_target.to(self.device)
 
         self.memory = ReplayMemory(memory_capacity)
         self.noise_function = noise_function
@@ -45,26 +45,85 @@ class DDPG:
         self.discount = 0.99
         self.iter = 0
 
+    def interpret(self, state, reward, done):
+        """Convert to tensors ready to be saved to memory.
+
+        Args:
+            state (numpy array) : BGR image
+            reward (float) : The reward value
+            done (boolean) : The done boolean
+
+        Returns:
+            state_tensor (float tensor) : Image as tensor on same device as
+                                          networks.
+            reward_tensor (float tensor) : Reward as tensor on same device as
+                                           networks.
+            done_tensor (float tensor) : Done boolean as 1 (false) or 0 (true)
+                                         on same device as networks.
+
+        """
+        return (self.state_to_tensor(state), self.reward_to_tensor(reward),
+                self.done_to_tensor(done))
+
+    def state_to_tensor(self, state):
+        """Convert the state to a tensor ready to be saved to memory.
+
+        Args:
+            state (numpy array) : BGR image
+
+        Returns:
+            float tensor : Image as tensor on same device as networks.
+
+        """
+        return (T.ToTensor()(state)).unsqueeze(0).to(self.device)
+
+    def reward_to_tensor(self, reward):
+        """Convert the reward to a tensor ready to be saved to memory.
+
+        Args:
+            reward (float) : The reward value
+
+        Returns:
+            float tensor : Reward as tensor on same device as networks
+
+        """
+        return torch.tensor([[reward]], device=self.device, dtype=torch.float)
+
+    def done_to_tensor(self, done):
+        """Convert the done boolean to a tensor ready to be saved to memory.
+
+        Args:
+            done (boolean) : The done boolean
+
+        Returns:
+            float tensor : Done boolean as 1 (false) or 0 (true) on same
+                           device as networks.
+
+        """
+        if done:
+            return torch.tensor([[0]], device=self.device, dtype=torch.float)
+        return torch.tensor([[1]], device=self.device, dtype=torch.float)
+
     def get_exploration_action(self, state):
         """Get an action from the actor with added noise if in exploration.
 
         Args:
-            state (object) : BGR cortical image
+            state(float tensor): BGR cortical image
 
         Returns:
-            list of float : Action Values with added noise
+            float tensor: Action with added noise
 
         """
-        noise_values = torch.tensor(self.noise_function())
-        if self.noise > self.final_noise:
-            self.noise -= self.noise_decay
-            if self.noise < self.final_noise:
-                self.noise = self.final_noise
-
-        action_values = (self.actor(T.ToTensor()(state).cuda().unsqueeze(0)
-                                    .float()).squeeze().cpu().detach())
-        noisy_action = action_values + self.noise * noise_values.float()
-        return noisy_action.clamp(-1, 1).numpy()
+        with torch.no_grad():
+            noise_values = torch.tensor(
+                self.noise_function(), device=self.device)
+            if self.noise > self.final_noise:
+                self.noise -= self.noise_decay
+                if self.noise < self.final_noise:
+                    self.noise = self.final_noise
+            action = self.actor(state)
+            noisy_action = action + self.noise * noise_values.float()
+            return noisy_action.clamp(-1, 1)
 
     def optimise(self):
         """Sample a random batch then optimise critic and actor."""
@@ -73,19 +132,16 @@ class DDPG:
             return
         sample = self.memory.sample(self.batch_size)
         batch = ReplayMemory.Experience(*zip(*sample))
-        state_batch = (torch.tensor(batch.state).cuda().permute(0, 3, 1, 2)
-                       .float() / 255)
-        action_batch = torch.tensor(batch.action).cuda().float()
-        reward_batch = torch.tensor(batch.reward).cuda().float()
-        next_state_batch = (torch.tensor(batch.next_state).cuda()
-                            .permute(0, 3, 1, 2).float() / 255)
-        final_state_batch = (
-            1 - torch.tensor(batch.final_state)).cuda().float()
+        state_batch = torch.cat(batch.state)
+        action_batch = torch.cat(batch.action)
+        reward_batch = torch.cat(batch.reward)
+        next_state_batch = torch.cat(batch.next_state)
+        done_batch = torch.cat(batch.done)
 
         # Optimise critic
         next_q = self.critic_target(
             next_state_batch, self.actor_target(next_state_batch))
-        expected_q = reward_batch + self.discount * final_state_batch * next_q
+        expected_q = reward_batch + self.discount * done_batch * next_q
         predicted_q = self.critic.forward(state_batch, action_batch)
         critic_loss = (expected_q - predicted_q).pow(2).mean()
         self.critic_optim.zero_grad()
@@ -113,8 +169,8 @@ class DDPG:
         """Save the models weights.
 
         Args:
-            path (string) : Path to folder to save models in
-            episode (int) : Will be appended to filename
+            path(string): Path to folder to save models in
+            episode(int): Will be appended to filename
 
         """
         torch.save(self.actor.state_dict(), path + "actor_" + str(episode))

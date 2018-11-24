@@ -31,24 +31,24 @@ def train():
     while not rospy.is_shutdown() and episode < total_episodes:
         episode += 1
         reward_sum = 0.0
-        curr_state = env.reset()
+        curr_state = trainer.state_to_tensor(env.reset())
         timestep = 0
         print "On episode : " + str(episode) + "/" + str(total_episodes)
         while not rospy.is_shutdown() and timestep < timesteps:
             timestep += 1
 
             action = trainer.get_exploration_action(curr_state)
-            next_state, reward, terminal_state = (
-                env.step(*action))
+            next_state, reward, done = env.step(*action[0])
+            reward_sum += reward
 
+            next_state, reward, done = trainer.interpret(
+                next_state, reward, done)
             trainer.memory.push(curr_state, action, next_state,
-                                [reward], [terminal_state])
+                                reward, done)
             trainer.optimise()
 
             curr_state = next_state
-            reward_sum += reward
-
-            if terminal_state:
+            if not done:    # Because the trainer converts True to 0
                 break
 
         reward_avg = reward_sum / timestep

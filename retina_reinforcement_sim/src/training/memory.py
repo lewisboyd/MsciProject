@@ -7,7 +7,7 @@ class ReplayMemory(object):
 
     Experience = namedtuple('Experience',
                             ('state', 'action', 'next_state', 'reward',
-                             'final_state'))
+                             'done'))
 
     def __init__(self, capacity):
         """Create empty list bounded by the capacity.
@@ -20,7 +20,7 @@ class ReplayMemory(object):
         self.memory = []
         self.position = 0
 
-    def push(self, state, action, next_state, reward, final_state):
+    def push(self, state, action, next_state, reward, done):
         """Save an experience overwritting an old experience if memory is full.
 
         Args:
@@ -28,13 +28,14 @@ class ReplayMemory(object):
             action (list of float) : The action values
             next_state (object) : Next state after action executed
             reward (float) : Reward given for executing the action
+            done (boolean) : If the episode is now finished
 
         """
         if len(self.memory) < self.capacity:
             self.memory.append(None)
         self.memory[self.position] = (
             ReplayMemory.Experience(state, action, next_state, reward,
-                                    final_state))
+                                    done))
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
