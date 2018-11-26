@@ -60,7 +60,6 @@ class DDPG:
         self.batch_size = batch_size
         self.tau = 0.001
         self.discount = 0.99
-        self.iter = 0
 
     def interpret(self, state, reward, done):
         """Convert to tensors ready to be saved to memory.
@@ -175,12 +174,6 @@ class DDPG:
         # Soft update
         self._soft_update(self.critic_target, self.critic)
         self._soft_update(self.actor_target, self.actor)
-
-        if self.iter % 100 == 0:
-            print('Iteration :- ', self.iter, ' Loss_actor :- ',
-                  actor_loss.data.cpu().numpy(), ' Loss_critic :- ',
-                  critic_loss.data.cpu().numpy())
-        self.iter += 1
 
     def save(self, path, episode):
         """Save the models weights.
