@@ -12,13 +12,18 @@ class Actor(nn.Module):
 
     """
 
-    def __init__(self):
-        """Initialise layers."""
+    def __init__(self, feature_extractor, num_features):
+        """Initialise layers.
+
+        Args:
+            feature_extractor (model) : The model to use to extract image
+                                        features
+            num_features (int) : Number of features the extractor will return
+
+        """
         super(Actor, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 8, 4)
-        self.conv2 = nn.Conv2d(32, 64, 4, 2)
-        self.conv3 = nn.Conv2d(64, 64, 3, 1)
-        self.fc1 = nn.Linear(95040, 512)
+        self.feature_extractor = feature_extractor
+        self.fc1 = nn.Linear(num_features, 512)
         self.fc2 = nn.Linear(512, 3)
         self.head = nn.Tanh()
 
@@ -26,16 +31,14 @@ class Actor(nn.Module):
         """Pass the image through the network.
 
         Args:
-            image (float tensor) : BGR cortical image
+            image (float tensor) : RGB cortical image
 
         Returns:
             float tensor: found_centre, move_wrist and move_elbow policy
 
         """
-        x = F.relu(self.conv1(image))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(-1, 95040)
+        x = self.feature_extractor(image)
+        x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.head(x)
@@ -50,30 +53,33 @@ class Critic(nn.Module):
 
     """
 
-    def __init__(self):
-        """Initialise layers."""
+    def __init__(self, feature_extractor, num_features):
+        """Initialise layers.
+
+        Args:
+            feature_extractor (model) : The model to use to extract image
+                                        features
+            num_features (int) : Number of features the extractor will return
+
+        """
         super(Critic, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 8, 4)
-        self.conv2 = nn.Conv2d(32, 64, 4, 2)
-        self.conv3 = nn.Conv2d(64, 64, 3, 1)
-        self.fc1 = nn.Linear(95043, 512)
+        self.feature_extractor = feature_extractor
+        self.fc1 = nn.Linear(num_features + 3, 512)
         self.head = nn.Linear(512, 1)
 
     def forward(self, image, action):
-        """Pass the image through the network.
+        """Pass the image and actions through the network.
 
         Args:
-            image (float tensor) : BGR cortical image
+            image (float tensor) : RGB cortical image
             action (float tensor) : The 3 action values
 
         Returns:
             float tensor : value of the action values in the state
 
         """
-        x = F.relu(self.conv1(image))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(-1, 95040)
+        x = self.feature_extractor(image)
+        x = x.view(x.size(0), -1)
         x = torch.cat((x, action), 1)
         x = F.relu(self.fc1(x))
         x = self.head(x)

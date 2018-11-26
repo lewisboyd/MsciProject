@@ -2,15 +2,17 @@ from model import Actor, Critic
 from memory import ReplayMemory
 from noise import NormalActionNoise
 import torch
+import torch.nn as nn
 import torchvision.transforms as T
+import torchvision.models as Models
 
 
 class DDPG:
     """Class responsible for network optimisation and deciding action."""
 
     def __init__(self, memory_capacity=1000, batch_size=200,
-                 noise_function=NormalActionNoise(0, 0.8, 3), init_noise=1.0,
-                 final_noise=0.02, exploration_len=1000):
+                 noise_function=NormalActionNoise(0, 0.2, 3), init_noise=1.0,
+                 final_noise=0.02, exploration_len=20000):
         """Initialise networks, memory and training params.
 
         Args:
@@ -19,17 +21,32 @@ class DDPG:
             critic_loss (object) : Loss function for the critic
 
         """
-        self.actor = Actor()
-        self.actor_target = Actor()
+        feature_extractor = Models.resnet18(pretrained=True)
+        feature_extractor = nn.Sequential(
+            *list(feature_extractor.children())[:-1])
+        for param in feature_extractor.parameters():
+            param.requires_grad = False
+        feature_extractor.eval()
+
+        self.transform = T.Compose([
+            T.ToPILImage(),
+            T.Resize((224, 224)),
+            T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        self.actor = Actor(feature_extractor, 512)
+        self.actor_target = Actor(feature_extractor, 512)
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_optim = torch.optim.Adam(self.actor.parameters(), 0.001)
 
-        self.critic = Critic()
-        self.critic_target = Critic()
+        self.critic = Critic(feature_extractor, 512)
+        self.critic_target = Critic(feature_extractor, 512)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001)
 
         self.device = torch.device("cuda:0")
+        feature_extractor.to(self.device)
         self.actor.to(self.device)
         self.actor_target.to(self.device)
         self.critic.to(self.device)
@@ -49,7 +66,7 @@ class DDPG:
         """Convert to tensors ready to be saved to memory.
 
         Args:
-            state (numpy array) : BGR image
+            state (numpy array) : RGB image
             reward (float) : The reward value
             done (boolean) : The done boolean
 
@@ -69,13 +86,13 @@ class DDPG:
         """Convert the state to a tensor ready to be saved to memory.
 
         Args:
-            state (numpy array) : BGR image
+            state (numpy array) : RGB image
 
         Returns:
             float tensor : Image as tensor on same device as networks.
 
         """
-        return (T.ToTensor()(state)).unsqueeze(0).to(self.device)
+        return self.transform(state).unsqueeze(0).to(self.device)
 
     def reward_to_tensor(self, reward):
         """Convert the reward to a tensor ready to be saved to memory.
@@ -108,7 +125,7 @@ class DDPG:
         """Get an action from the actor with added noise if in exploration.
 
         Args:
-            state(float tensor): BGR cortical image
+            state(float tensor): RGB cortical image
 
         Returns:
             float tensor: Action with added noise

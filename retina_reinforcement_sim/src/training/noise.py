@@ -4,7 +4,7 @@ import numpy as np
 class NormalActionNoise:
     """Normally distributed noise."""
 
-    def __init__(self, mu=0, sigma=0.3, actions=3):
+    def __init__(self, mu=0, sigma=0.2, actions=3):
         """Initialise parameters.
 
         Args:

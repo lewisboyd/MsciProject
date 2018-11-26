@@ -36,20 +36,20 @@ bridge = CvBridge()
 
 
 def process_image_data(image_data):
-    """Create an OpenCV BGR image and cortical image from the image data.
+    """Create an OpenCV RGB image and cortical image from the image data.
 
     Args:
         image_data (object): ROS image message
 
     Returns:
-        object: OpenCV BGR image
-        object: Cortical BGR image
+        object: OpenCV RGB image
+        object: Cortical RGB image
 
     """
     global bridge
 
     # Convert to OpenCV image
-    image = bridge.imgmsg_to_cv2(image_data, "bgr8")
+    image = bridge.imgmsg_to_cv2(image_data, "rgb8")
 
     # Sample with retina
     cortical_image = _retina_sample(image)
@@ -61,7 +61,7 @@ def calc_dist(image):
     """Calculate the distance from the image's centre to ball's centre.
 
     Args:
-        image: BGR OpenCV image
+        image: RGB OpenCV image
 
     Returns:
         distance of ball to centre of image, or -1 if unsuccessful
@@ -93,7 +93,7 @@ def _create_mask(image):
     ORANGE_MAX = np.array([15, 255, 255], np.uint8)
 
     # Threshold the image in the HSV colour space
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     mask = cv2.inRange(hsv_image, ORANGE_MIN, ORANGE_MAX)
 
     # Return the mask

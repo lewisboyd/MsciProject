@@ -107,7 +107,7 @@ class Environment:
 
     def _evaluate_found_action(self):
         if self._curr_dist < self._threshold:
-            return self.state, 2, True
+            return self.state, 1, True
         else:
             return self.state, -1, False
 
@@ -117,8 +117,11 @@ class Environment:
             return self.state, -1, True
         elif self._prev_dist < self._threshold:
             return self.state, -1, False
+        elif self._prev_dist < self._curr_dist:
+            return self.state, -1, False
         else:
-            return self.state, 1.0 - (self._curr_dist / self._max_dist), False
+            return self.state, ((self._prev_dist - self._curr_dist)
+                                / float(self._prev_dist)), False
 
     def _update_state(self):
         sleep(1)  # Small wait to ensure sensors up to date
