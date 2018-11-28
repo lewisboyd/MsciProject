@@ -139,16 +139,14 @@ class Environment:
                                  'left_e1': 0.68,
                                  'left_s0': -0.8,
                                  'left_s1': -0.8}
-        self._left_arm.move_to_joint_positions(starting_joint_angles,
-                                               threshold=0.004)
+        self._left_arm.move_to_joint_positions(starting_joint_angles)
 
     def _move_arm(self, wrist, elbow):
         wrist_angle = self._left_arm.joint_angle('left_w1') + wrist
         elbow_angle = self._left_arm.joint_angle('left_e1') + elbow
         joint_angles = {'left_w1': wrist_angle,
                         'left_e1': elbow_angle}
-        self._left_arm.move_to_joint_positions(
-            joint_angles, threshold=0.004)
+        self._left_arm.move_to_joint_positions(joint_angles)
 
     def _move_ball_location(self):
         # Generate random y and z locations

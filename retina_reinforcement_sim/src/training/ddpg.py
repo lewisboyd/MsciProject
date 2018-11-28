@@ -10,9 +10,9 @@ import torchvision.models as Models
 class DDPG:
     """Class responsible for network optimisation and deciding action."""
 
-    def __init__(self, memory_capacity=1000, batch_size=200,
+    def __init__(self, memory_capacity=1000, batch_size=32,
                  noise_function=NormalActionNoise(0, 0.2, 3), init_noise=1.0,
-                 final_noise=0.02, exploration_len=20000):
+                 final_noise=0.02, exploration_len=200):
         """Initialise networks, memory and training params.
 
         Args:
@@ -145,7 +145,7 @@ class DDPG:
         """Sample a random batch then optimise critic and actor."""
         # Sample memory
         if len(self.memory) < self.batch_size:
-            return
+            return None, None
         sample = self.memory.sample(self.batch_size)
         batch = ReplayMemory.Experience(*zip(*sample))
         state_batch = torch.cat(batch.state)
@@ -174,6 +174,9 @@ class DDPG:
         # Soft update
         self._soft_update(self.critic_target, self.critic)
         self._soft_update(self.actor_target, self.actor)
+
+        return (critic_loss.cpu().detach().item(),
+                actor_loss.cpu().detach().item())
 
     def save(self, path, episode):
         """Save the models weights.
