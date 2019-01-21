@@ -1,2 +1,2 @@
 from environment import Environment
-import image_processor
+from pendulum_environment import Environment as PendulumEnvironment
