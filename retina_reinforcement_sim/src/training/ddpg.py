@@ -1,6 +1,5 @@
 from memory import ReplayMemory
 import torch
-import torch.nn as nn
 from torch.nn import functional as F
 
 
@@ -20,6 +19,10 @@ class DDPG:
             init_noise (double) : Initial amount of noise to be added
             final_noise (double) : Final amount of noise to be added
             exploration_len (int) : Number of steps to decay noise over
+            actor (object): Actor constructor to use
+            actor_args (array): Args for actor constructor
+            critic (object): Critic constructor to use
+            critic_args (array): Args for critic constructor
 
         """
         self.memory = ReplayMemory(memory_capacity)

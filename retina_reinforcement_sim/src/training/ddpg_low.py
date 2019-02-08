@@ -1,7 +1,71 @@
 import torch
 import torch.nn as nn
-from ddpg import DDPG
 import torch.nn.functional as F
+
+from ddpg import DDPG
+
+
+class DDPGLow(DDPG):
+    """Class responsible for creating tensors before pushing to memory."""
+
+    def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
+                 final_noise, exploration_len, state_dim, action_dim):
+        """Initialise networks, memory and training params.
+
+        Args:
+            memory_capacity (int) : Maximum capacity of the memory
+            batch_size (int) : Sample size from memory when optimising
+            noise_function (object) : Function to generate random additive
+                                      noise
+            init_noise (double) : Initial amount of noise to be added
+            final_noise (double) : Final amount of noise to be added
+            exploration_len (int) : Number of steps to decay noise over
+            state_dim (int) : Number of state inputs
+            action_dim (int) : Number of action ouputs
+
+        """
+        DDPG.__init__(self, memory_capacity, batch_size, noise_function,
+                      init_noise, final_noise, exploration_len,
+                      Actor, [state_dim, action_dim], Critic,
+                      [state_dim, action_dim])
+
+    def state_to_tensor(self, state):
+        """Convert the state to a tensor ready to be used and saved.
+
+        Args:
+            state (numpy array) : The array of observations.
+
+        Returns:
+            state_tensor (float tensor) : Observations as tensor.
+
+        """
+        return torch.tensor(state, dtype=torch.float).to(self.device)
+
+    def reward_to_tensor(self, reward):
+        """Convert the reward to a tensor ready to be saved.
+
+        Args:
+            reward (float) : The reward value
+
+        Returns:
+            float tensor : Reward as a tensor
+
+        """
+        return torch.tensor([reward], dtype=torch.float).to(self.device)
+
+    def done_to_tensor(self, done):
+        """Convert the done boolean to a tensor ready to be saved.
+
+        Args:
+            done (boolean) : The done boolean
+
+        Returns:
+            float tensor : Done boolean as 1 (false) or 0 (true) tensor.
+
+        """
+        if done:
+            return torch.tensor([0], dtype=torch.float).to(self.device)
+        return torch.tensor([1], dtype=torch.float).to(self.device)
 
 
 class Actor(nn.Module):
@@ -70,66 +134,3 @@ class Critic(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-
-
-class DDPGLow(DDPG):
-    """Class responsible for creating tensors before pushing to memory."""
-
-    def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, state_dim, action_dim):
-        """Initialise networks, memory and training params.
-
-        Args:
-            memory_capacity (int) : Maximum capacity of the memory
-            batch_size (int) : Sample size from memory when optimising
-            noise_function (object) : Function to generate random additive
-                                      noise
-            init_noise (double) : Initial amount of noise to be added
-            final_noise (double) : Final amount of noise to be added
-            exploration_len (int) : Number of steps to decay noise over
-            state_dim (int) : Number of state inputs
-            action_dim (int) : Number of action ouputs
-
-        """
-        DDPG.__init__(self, memory_capacity, batch_size, noise_function,
-                      init_noise, final_noise, exploration_len,
-                      Actor, [state_dim, action_dim], Critic,
-                      [state_dim, action_dim])
-
-    def state_to_tensor(self, state):
-        """Convert the state to a tensor ready to be used and saved.
-
-        Args:
-            state (numpy array) : The array of observations.
-
-        Returns:
-            state_tensor (float tensor) : Observations as tensor.
-
-        """
-        return torch.tensor(state, dtype=torch.float).to(self.device)
-
-    def reward_to_tensor(self, reward):
-        """Convert the reward to a tensor ready to be saved.
-
-        Args:
-            reward (float) : The reward value
-
-        Returns:
-            float tensor : Reward as a tensor
-
-        """
-        return torch.tensor([reward], dtype=torch.float).to(self.device)
-
-    def done_to_tensor(self, done):
-        """Convert the done boolean to a tensor ready to be saved.
-
-        Args:
-            done (boolean) : The done boolean
-
-        Returns:
-            float tensor : Done boolean as 1 (false) or 0 (true) tensor.
-
-        """
-        if done:
-            return torch.tensor([0], dtype=torch.float).to(self.device)
-        return torch.tensor([1], dtype=torch.float).to(self.device)

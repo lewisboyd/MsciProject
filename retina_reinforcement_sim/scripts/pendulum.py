@@ -2,7 +2,7 @@
 
 import os
 from environment import PendulumPixel, PendulumLow
-from training import DDPGLow, PendulumPixelDDPG, \
+from training import DDPGLow, DDPGPixel, \
     OrnsteinUhlenbeckActionNoise, train
 
 
@@ -49,15 +49,15 @@ if __name__ == '__main__':
     #             eval_freq=EVAL_FREQ_LOW)
 
     # Train DDPG agent on pendulum without retina
-    agent = PendulumPixelDDPG(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-                              INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL)
+    agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
+                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1)
     environment = PendulumPixel(False)
     train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
           MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL)
 
     # Train DDPG agent on pendulum with retina
-    # agent = PendulumPixelDDPG(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-    #                           INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL)
+    # agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
+    #                   INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1)
     # environment = PendulumPixel(True)
     # train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
     #             MODEL_FOLDER_PIXEL, DATA_FOLDER_RETINA)
