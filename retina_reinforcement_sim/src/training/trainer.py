@@ -105,7 +105,9 @@ def train(env, agent, init_explore, max_episodes, max_steps,
     env.close()
 
     end = time.time()
-    print "Training finished after %0.2f hours" % ((start - end) / 3600)
+    mins = (end - start) / 60
+    print "Training finished after %d hours %d minutes" % (
+        mins / 60, mins % 60)
 
 
 def _evaluate(agent, env, max_steps, eval_episodes=10):
