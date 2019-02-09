@@ -26,9 +26,9 @@ def train(env, agent, init_explore, max_episodes, max_steps,
     """
     # Create folders for saving data
     if not os.path.isdir(model_folder):
-        os.makedirs(model_folder, exist_ok=True)
+        os.makedirs(model_folder)
     if not os.path.isdir(data_folder):
-        os.makedirs(data_folder, exist_ok=True)
+        os.makedirs(data_folder)
 
     start = time.time()
 
