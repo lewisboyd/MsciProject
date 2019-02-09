@@ -27,17 +27,17 @@ if __name__ == '__main__':
 
     # Save paths
     MODEL_FOLDER_NORMAL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/state_dicts/pendulum_normal/")
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/normal/")
     MODEL_FOLDER_PIXEL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/state_dicts/pendulum_pixel/")
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/pixel/")
     MODEL_FOLDER_RETINA = (os.path.dirname(
-        os.path.realpath(__file__)) + "/state_dicts/pendulum_retina/")
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/retina/")
     DATA_FOLDER_NORMAL = (os.path.dirname(os.path.realpath(__file__))
-                          + "/results/pendulum_normal/")
+                          + "/pendulum/results/low_dim/")
     DATA_FOLDER_PIXEL = (os.path.dirname(os.path.realpath(__file__))
-                         + "/results/pendulum_pixel/")
+                         + "/pendulum/results/pixel/")
     DATA_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
-                          + "/results/pendulum_retina/")
+                          + "/pendulum/results/retina/")
 
     # Train DDPG agent on pendulum low state dimension
     # agent = DDPGLow(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION, INIT_NOISE,
