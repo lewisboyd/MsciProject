@@ -1,7 +1,8 @@
+import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import time
 
 
 def train(env, agent, init_explore, max_episodes, max_steps,
@@ -23,6 +24,12 @@ def train(env, agent, init_explore, max_episodes, max_steps,
         eval_freq (int): How many episodes of training before next evaluation.
         eval_ep (int): How many episodes to run for evaluation.
     """
+    # Create folders for saving data
+    if not os.path.isdir(model_folder):
+        os.makedirs(model_folder, exist_ok=True)
+    if not os.path.isdir(data_folder):
+        os.makedirs(data_folder, exist_ok=True)
+
     start = time.time()
 
     # Create interactive plot
