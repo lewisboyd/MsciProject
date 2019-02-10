@@ -16,8 +16,9 @@ if __name__ == '__main__':
 
     # Agent variables
     REPLAY_SIZE = 100000
-    BATCH_SIZE = 1028
+    BATCH_SIZE = 16
     NOISE_FUNCTION = OrnsteinUhlenbeckActionNoise(1)
+    REWARD_SCALE = 0.1
     INIT_NOISE = 1
     FINAL_NOISE = 0.02
     EXPLORATION_LEN_PIXEL = 100000
@@ -50,11 +51,11 @@ if __name__ == '__main__':
 
     # Train DDPG agent on pendulum without retina
     agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1,
-                      0.1)
+                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3,
+                      ACTION_DIM, REWARD_SCALE)
     environment = PendulumPixel(False)
     train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-          MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL)
+          MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL, [-4700, 0])
 
     # Train DDPG agent on pendulum with retina
     # agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
