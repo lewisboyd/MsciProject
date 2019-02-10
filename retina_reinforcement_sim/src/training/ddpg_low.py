@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,7 +10,8 @@ class DDPGLow(DDPG):
     """Class responsible for creating tensors before pushing to memory."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, state_dim, action_dim):
+                 final_noise, exploration_len, state_dim, action_dim,
+                 reward_scale):
         """Initialise networks, memory and training params.
 
         Args:
@@ -27,7 +29,7 @@ class DDPGLow(DDPG):
         DDPG.__init__(self, memory_capacity, batch_size, noise_function,
                       init_noise, final_noise, exploration_len,
                       Actor, [state_dim, action_dim], Critic,
-                      [state_dim, action_dim])
+                      [state_dim, action_dim], reward_scale)
 
     def state_to_tensor(self, state):
         """Convert the state to a tensor ready to be used and saved.
@@ -51,7 +53,8 @@ class DDPGLow(DDPG):
             float tensor : Reward as a tensor
 
         """
-        return torch.tensor([reward], dtype=torch.float).to(self.device)
+        return torch.tensor([reward * self.reward_scale],
+                            dtype=torch.float).to(self.device)
 
     def done_to_tensor(self, done):
         """Convert the done boolean to a tensor ready to be saved.
@@ -79,10 +82,19 @@ class Actor(nn.Module):
             action_dim (int) : Number of action ouputs
 
         """
+        # Create network
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(state_dim, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, action_dim)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, batch):
@@ -112,10 +124,19 @@ class Critic(nn.Module):
             action_dim (int) : Number of action ouputs
 
         """
+        # Create network
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(state_dim, 400)
         self.fc2 = nn.Linear(400 + action_dim, 300)
         self.fc3 = nn.Linear(300, 1)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, state_batch, action_batch):

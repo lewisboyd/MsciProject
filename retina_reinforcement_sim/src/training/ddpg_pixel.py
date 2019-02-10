@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,7 +11,8 @@ class DDPGPixel(DDPG):
     """Class responsible for creating tensors before pushing to memory."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, num_images, num_actions):
+                 final_noise, exploration_len, num_images, num_actions,
+                 reward_scale):
         """Initialise networks, memory and training params.
 
         Args:
@@ -28,7 +30,7 @@ class DDPGPixel(DDPG):
         DDPG.__init__(self, memory_capacity, batch_size, noise_function,
                       init_noise, final_noise, exploration_len,
                       ActorCNN, [num_images, num_actions],
-                      CriticCNN, [num_images, num_actions])
+                      CriticCNN, [num_images, num_actions], reward_scale)
 
         self.num_images = num_images
 
@@ -66,7 +68,8 @@ class DDPGPixel(DDPG):
             float tensor : Reward as a tensor
 
         """
-        return torch.tensor([reward], dtype=torch.float).to(self.device)
+        return torch.tensor([reward * self.reward_scale],
+                            dtype=torch.float).to(self.device)
 
     def done_to_tensor(self, done):
         """Convert the done boolean to a tensor ready to be saved.
@@ -94,6 +97,7 @@ class ActorCNN(nn.Module):
             num_actions (int) : Number of actions
 
         """
+        # Create network
         super(ActorCNN, self).__init__()
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
@@ -101,6 +105,23 @@ class ActorCNN(nn.Module):
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, num_actions)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
+        nn.init.uniform_(self.conv1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv2.weight)
+        nn.init.uniform_(self.conv2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv3.weight)
+        nn.init.uniform_(self.conv3.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, batch):
@@ -134,6 +155,7 @@ class CriticCNN(nn.Module):
             num_actions (int) : Number of actions
 
         """
+        # Create network
         super(CriticCNN, self).__init__()
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
@@ -141,6 +163,23 @@ class CriticCNN(nn.Module):
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512 + num_actions, 256)
         self.fc3 = nn.Linear(256, 1)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
+        nn.init.uniform_(self.conv1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv2.weight)
+        nn.init.uniform_(self.conv2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv3.weight)
+        nn.init.uniform_(self.conv3.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, state_batch, action_batch):

@@ -8,7 +8,7 @@ class DDPG:
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
                  final_noise, exploration_len, actor, actor_args, critic,
-                 critic_args):
+                 critic_args, reward_scale):
         """Initialise networks, memory and training params.
 
         Args:
@@ -23,7 +23,7 @@ class DDPG:
             actor_args (array): Args for actor constructor
             critic (object): Critic constructor to use
             critic_args (array): Args for critic constructor
-
+            reward_scale (float): Rescales received rewards before saving
         """
         self.memory = ReplayMemory(memory_capacity)
         self.batch_size = batch_size
@@ -33,6 +33,7 @@ class DDPG:
         self.noise_decay = (init_noise - final_noise) / exploration_len
         self.tau = 0.001
         self.discount = 0.99
+        self.reward_scale = reward_scale
         self.device = torch.device("cuda:0")
 
         # Create actor networks
@@ -45,7 +46,8 @@ class DDPG:
         self.critic = critic(*critic_args).to(self.device)
         self.critic_target = critic(*critic_args).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001)
+        self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001,
+                                             weight_decay=0.01)
 
     def get_exploitation_action(self, state):
         """Generate action policy without noise.

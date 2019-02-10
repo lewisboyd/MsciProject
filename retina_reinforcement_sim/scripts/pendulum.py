@@ -9,7 +9,7 @@ from training import DDPGLow, DDPGPixel, \
 if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 500
-    MAX_EPISODES_PIXEL = 5000
+    MAX_EPISODES_PIXEL = 2000
     MAX_EPISODES_LOW = 400
     MAX_STEPS = 200
     EVAL_FREQ_LOW = 10
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # Train DDPG agent on pendulum low state dimension
     # agent = DDPGLow(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION, INIT_NOISE,
     #                 FINAL_NOISE, EXPLORATION_LEN_LOW, STATE_DIM_LOW,
-    #                 ACTION_DIM)
+    #                 ACTION_DIM, 0.1)
     # environment = PendulumLow()
     # train(environment, agent, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
     #             MODEL_FOLDER_NORMAL, DATA_FOLDER_NORMAL,
@@ -50,14 +50,16 @@ if __name__ == '__main__':
 
     # Train DDPG agent on pendulum without retina
     agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1)
+                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1,
+                      0.1)
     environment = PendulumPixel(False)
     train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
           MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL)
 
     # Train DDPG agent on pendulum with retina
     # agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-    #                   INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1)
+    #                   INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1
+    #                   0.1)
     # environment = PendulumPixel(True)
     # train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
     #             MODEL_FOLDER_PIXEL, DATA_FOLDER_RETINA)
