@@ -2,8 +2,7 @@
 
 import os
 from environment import PendulumPixel, PendulumLow
-from training import DDPGLow, DDPGPixel, \
-    OrnsteinUhlenbeckActionNoise, train
+from training import DdpgMlp, DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
 
 
 if __name__ == '__main__':
@@ -16,15 +15,23 @@ if __name__ == '__main__':
 
     # Agent variables
     REPLAY_SIZE = 100000
-    BATCH_SIZE = 16
     NOISE_FUNCTION = OrnsteinUhlenbeckActionNoise(1)
     REWARD_SCALE = 0.1
     INIT_NOISE = 1
     FINAL_NOISE = 0.02
     EXPLORATION_LEN_PIXEL = 100000
     EXPLORATION_LEN_LOW = 10000
-    STATE_DIM_LOW = 3
     ACTION_DIM = 1
+
+    # Agent variables low state
+    STATE_DIM_LOW = 3
+    BATCH_SIZE_LOW = 64
+
+    # Agent variables image
+    NUM_IMAGES = 3
+    BATCH_SIZE_IMAGE = 16
+    IMAGE_SIZE = (500, 500)
+
 
     # Save paths
     MODEL_FOLDER_NORMAL = (os.path.dirname(
@@ -41,26 +48,27 @@ if __name__ == '__main__':
                           + "/pendulum/results/retina/")
 
     # Train DDPG agent on pendulum low state dimension
-    # agent = DDPGLow(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION, INIT_NOISE,
+    # agent = DdpgMlp(REPLAY_SIZE, BATCH_SIZE_LOW, NOISE_FUNCTION, INIT_NOISE,
     #                 FINAL_NOISE, EXPLORATION_LEN_LOW, STATE_DIM_LOW,
-    #                 ACTION_DIM, 0.1)
+    #                 ACTION_DIM, REWARD_SCALE)
     # environment = PendulumLow()
-    # train(environment, agent, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
+    # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
     #             MODEL_FOLDER_NORMAL, DATA_FOLDER_NORMAL,
     #             eval_freq=EVAL_FREQ_LOW)
 
-    # Train DDPG agent on pendulum without retina
-    agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-                      INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3,
-                      ACTION_DIM, REWARD_SCALE)
+    # Create Pendulum environment returning 3 images
     environment = PendulumPixel(False)
-    train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-          MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL, [-4700, 0])
 
-    # Train DDPG agent on pendulum with retina
-    # agent = DDPGPixel(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION,
-    #                   INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, 3, 1
-    #                   0.1)
-    # environment = PendulumPixel(True)
-    # train(environment, agent, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-    #             MODEL_FOLDER_PIXEL, DATA_FOLDER_RETINA)
+    # Train DDPG agent using CNN
+    agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
+                    INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, NUM_IMAGES,
+                    ACTION_DIM, REWARD_SCALE)
+    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
+                MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL, [-4700, 0])
+
+    # Train DDPG agent using retina
+    # agent = DdpgRetina(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
+    #                    INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
+    #                    NUM_IMAGES, ACTION_DIM, REWARD_SCALE, IMAGE_SIZE)
+    # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
+    #             MODEL_FOLDER_PIXEL, DATA_FOLDER_RETINA, [-4700, 0])
