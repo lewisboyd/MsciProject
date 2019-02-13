@@ -53,9 +53,9 @@ class PendulumPixel:
         img2 = self.env.render(mode='rgb_array')
         _, reward3, _, _ = self.env.step(action)
         img3 = self.env.render(mode='rgb_array')
-        new_state = np.stack((img1, img2, img3))
+        new_obs = np.stack((img1, img2, img3))
         reward = reward1 + reward2 + reward3
-        return new_state, reward
+        return new_obs, reward
 
     def close(self):
         """Close the environment."""

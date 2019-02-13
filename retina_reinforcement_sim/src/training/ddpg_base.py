@@ -1,6 +1,7 @@
-from memory import ReplayMemory
 import torch
 from torch.nn import functional as F
+
+from memory import ReplayMemory
 
 
 class DdpgBase:

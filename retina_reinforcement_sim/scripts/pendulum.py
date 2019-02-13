@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+
 from environment import PendulumPixel, PendulumLow
 from training import DdpgMlp, DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
 
@@ -8,29 +9,33 @@ from training import DdpgMlp, DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
 if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 500
-    MAX_EPISODES_PIXEL = 2000
-    MAX_EPISODES_LOW = 400
     MAX_STEPS = 200
+
+    # Training variables low state
+    MAX_EPISODES_LOW = 400
     EVAL_FREQ_LOW = 10
+
+    # Training variables image
+    MAX_EPISODES_PIXEL = 2000
 
     # Agent variables
     REPLAY_SIZE = 100000
-    NOISE_FUNCTION = OrnsteinUhlenbeckActionNoise(1)
     REWARD_SCALE = 0.1
+    ACTION_DIM = 1
+    NOISE_FUNCTION = OrnsteinUhlenbeckActionNoise(ACTION_DIM)
     INIT_NOISE = 1
     FINAL_NOISE = 0.02
-    EXPLORATION_LEN_PIXEL = 100000
-    EXPLORATION_LEN_LOW = 10000
-    ACTION_DIM = 1
 
     # Agent variables low state
-    STATE_DIM_LOW = 3
     BATCH_SIZE_LOW = 64
+    STATE_DIM_LOW = 3
+    EXPLORATION_LEN_LOW = 10000
 
     # Agent variables image
-    NUM_IMAGES = 3
     BATCH_SIZE_IMAGE = 16
+    NUM_IMAGES = 3
     IMAGE_SIZE = (500, 500)
+    EXPLORATION_LEN_PIXEL = 100000
 
 
     # Save paths
@@ -57,7 +62,7 @@ if __name__ == '__main__':
     #             eval_freq=EVAL_FREQ_LOW)
 
     # Create Pendulum environment returning 3 images
-    environment = PendulumPixel(False)
+    environment = PendulumPixel()
 
     # Train DDPG agent using CNN
     agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
