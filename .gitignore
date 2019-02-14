@@ -1,2 +1,3 @@
 *.pyc
 *.png
+retina_reinforcement_sim/scripts/pendulum/*
