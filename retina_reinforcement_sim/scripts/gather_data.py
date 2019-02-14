@@ -2,8 +2,9 @@
 
 import os
 
-import torch
+import gym
 import numpy as np
+import torch
 
 from training import DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
 
@@ -18,7 +19,7 @@ class Pendulum:
     def reset(self):
         """Reset the environment."""
         self.env.reset()
-        obs, state, _ = self.step(0)
+        obs, state, _ = self.step([0])
         return obs, state
 
     def step(self, action):
@@ -51,7 +52,7 @@ if __name__ == '__main__':
 
     # Create agents purely for processing images
     agentCnn = DdpgCnn(0, 0, None, 1, 1, 1, 3, 1, 1)
-    agentRetina = DdpgRetina(0, 0, None, 1, 1, 1, 3, 1, 1, (500, 500))
+    # agentRetina = DdpgRetina(0, 0, None, 1, 1, 1, 3, 1, 1, (500, 500))
 
     # Create environment
     env = Pendulum()
@@ -64,10 +65,10 @@ if __name__ == '__main__':
     images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float, device=device)
     next_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
                              device=device)
-    retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
-                               device=device)
-    next_retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
-                               device=device)
+    # retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
+    #                            device=device)
+    # next_retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
+    #                                 device = device)
     states = torch.ones((SIZE, 3), dtype=torch.float, device=device)
     next_states = torch.ones((SIZE, 3), dtype=torch.float, device=device)
     actions = torch.ones((SIZE, 1), dtype=torch.float, device=device)
@@ -75,33 +76,37 @@ if __name__ == '__main__':
     dones = torch.ones((SIZE, 1), dtype=torch.float, device=device)
 
     # Populate tensors
-    for ep in range(500):
+    index = -1
+    while index < SIZE:
         # Reset noise function and environment
         noise_function.reset()
         obs, state = env.reset()
         image = agentCnn.interpet(obs)
-        retinaImage = agentRetina.interpet(obs)
+        # retina_image = agentRetina.interpet(obs)
 
         for step in range(200):
+            index += 1
+            if index == SIZE:
+                break
+
             # Step through environment
-            action = torch.tensor(self.noise_function(), dtype = torch.float,
+            action = torch.tensor(noise_function(), dtype=torch.float,
                                   device=device).clamp(-1, 1)
-            next_obs, new_state, reward = env.step(action)
+            next_obs, next_state, reward = env.step(action)
             done = 0 if step == 199 else 1
 
             # Get next image and retina image
             next_image = agentCnn.interpet(next_obs)
-            next_retina_image = agentRetina.interpet(next_obs)
+            # next_retina_image = agentRetina.interpet(next_obs)
 
             # Normalise state to between -1, 1
             state[2] = state[2] / 8
 
             # Save processed observations and state descriptor
-            index = (ep * 200) + step
             images[index] = image
-            retinaImages[index] = retinaImage
             next_images[index] = next_image
-            next_retina_images[index] = next_retina_image
+            # retina_images[index] = retina_image
+            # next_retina_images[index] = next_retina_image
             states[index] = torch.tensor(state, device=device)
             next_states[index] = torch.tensor(next_state, device=device)
             actions[index] = action
@@ -110,34 +115,34 @@ if __name__ == '__main__':
 
             # Update current image, retina_image and state
             image = next_image
-            retina_image = next_retina_image
+            # retina_image = next_retina_image
             state = next_state
 
     # Shuffle data
-    np.random.seed(40)
-    np.random.shuffle(images.numpy())
-    np.random.seed(40)
-    np.random.shuffle(next_images.numpy())
-    np.random.seed(40)
-    np.random.shuffle(retina_images.numpy())
-    np.random.seed(40)
-    np.random.shuffle(next_retina_images.numpy())
-    np.random.seed(40)
-    np.random.shuffle(states.numpy())
-    np.random.seed(40)
-    np.random.shuffle(next_states.numpy())
-    np.random.seed(40)
-    np.random.shuffle(actions.numpy())
-    np.random.seed(40)
-    np.random.shuffle(rewards.numpy())
-    np.random.seed(40)
-    np.random.shuffle(dones.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(images.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(next_images.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(retina_images.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(next_retina_images.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(states.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(next_states.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(actions.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(rewards.numpy())
+    # np.random.seed(40)
+    # np.random.shuffle(dones.numpy())
 
     # Save data
     torch.save(images, DATA_FOLDER + "images")
     torch.save(next_images, DATA_FOLDER + "next_images")
-    torch.save(retina_images, DATA_FOLDER + "retina_images")
-    torch.save(next_retina_images, DATA_FOLDER + "next_retina_images")
+    # torch.save(retina_images, DATA_FOLDER + "retina_images")
+    # torch.save(next_retina_images, DATA_FOLDER + "next_retina_images")
     torch.save(states, DATA_FOLDER + "states")
     torch.save(next_states, DATA_FOLDER + "next_states")
     torch.save(actions, DATA_FOLDER + "actions")

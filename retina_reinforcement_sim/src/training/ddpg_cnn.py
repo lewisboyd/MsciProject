@@ -21,9 +21,9 @@ class DdpgCnn(DdpgBase):
             num_actions (int): Number of possible actions
         """
         DdpgBase.__init__(self, memory_capacity, batch_size, noise_function,
-                      init_noise, final_noise, exploration_len,
-                      ActorCNN, [num_images, num_actions],
-                      CriticCNN, [num_images, num_actions], reward_scale)
+                          init_noise, final_noise, exploration_len,
+                          Actor, [num_images, num_actions],
+                          Critic, [num_images, num_actions], reward_scale)
 
         self.num_images = num_images
 
@@ -42,7 +42,7 @@ class DdpgCnn(DdpgBase):
         return state_tensor
 
 
-class ActorCNN(nn.Module):
+class Actor(nn.Module):
     """Represents an Actor in the Actor to Critic Model."""
 
     def __init__(self, num_images, num_actions):
@@ -54,7 +54,7 @@ class ActorCNN(nn.Module):
 
         """
         # Create network
-        super(ActorCNN, self).__init__()
+        super(Actor, self).__init__()
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
         self.conv3 = nn.Conv2d(64, 64, 3)
@@ -100,7 +100,7 @@ class ActorCNN(nn.Module):
         return x
 
 
-class CriticCNN(nn.Module):
+class Critic(nn.Module):
     """Represents a Critic in the Actor to Critic Model."""
 
     def __init__(self, num_images, num_actions):
@@ -112,7 +112,7 @@ class CriticCNN(nn.Module):
 
         """
         # Create network
-        super(CriticCNN, self).__init__()
+        super(Critic, self).__init__()
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
         self.conv3 = nn.Conv2d(64, 64, 3)

@@ -37,7 +37,6 @@ if __name__ == '__main__':
     IMAGE_SIZE = (500, 500)
     EXPLORATION_LEN_PIXEL = 100000
 
-
     # Save paths
     MODEL_FOLDER_NORMAL = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/state_dicts/normal/")

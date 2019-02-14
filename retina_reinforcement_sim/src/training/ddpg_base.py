@@ -1,6 +1,10 @@
+import os
+import time
+
+import numpy as np
+import matplotlib.pyplot as plt
 import torch
 from torch.nn import functional as F
-import matplotlib.pyplot as plt
 
 from memory import ReplayMemory
 
@@ -56,20 +60,22 @@ class DdpgBase:
         """Process environment obsevation to get state tensor."""
         raise NotImplementedError("Implement in child class.")
 
-    def train(env, init_explore, max_episodes, max_steps,
+    def train(self, env, init_explore, max_episodes, max_steps,
               model_folder, data_folder, plot_ylim=[-200, 0], eval_freq=100,
               eval_ep=10):
         """Train the agent.
 
         Args:
             env (object): Environment to train agent in.
-            init_explore (int): Number of episodes to prepopulate replay buffer.
+            init_explore (int): Number of episodes to prepopulate replay
+                                buffer.
             max_episodes (int): Maximum number of training episodes.
             max_steps (int): Maximum number of steps in one episode.
             model_folder (path): Folder to save models in during training.
             data_folder (path): Folder to save evaluation data.
             plot_ylim (array): Min and max value for episode reward axis.
-            eval_freq (int): How many episodes of training before next evaluation.
+            eval_freq (int): How many episodes of training before next
+                             evaluation.
             eval_ep (int): How many episodes to run for evaluation.
         """
         # Create folders for saving data
@@ -139,7 +145,8 @@ class DdpgBase:
                 # Update current state
                 state = new_state
 
-            print "Episode: %4d/%4d  Reward: %0.2f" % (ep, max_episodes, ep_reward)
+            print "Episode: %4d/%4d  Reward: %0.2f" % (
+                ep, max_episodes, ep_reward)
 
             # Evaluate performance and save agent every 100 episodes
             if ep % eval_freq == 0:
@@ -162,7 +169,7 @@ class DdpgBase:
         end = time.time()
         mins = (end - start) / 60
         print "Training finished after %d hours %d minutes" % (
-           mins / 60, mins % 60)
+            mins / 60, mins % 60)
 
     def _optimise(self):
         # Sample memory
@@ -212,7 +219,7 @@ class DdpgBase:
             return torch.tensor([0], dtype=torch.float).to(self.device)
         return torch.tensor([1], dtype=torch.float).to(self.device)
 
-    def _evaluate(env, max_steps, eval_episodes=10):
+    def _evaluate(self, env, max_steps, eval_episodes=10):
         # Average multiple episode rewards
         avg_reward = 0.
         for _ in range(eval_episodes):
@@ -224,7 +231,6 @@ class DdpgBase:
                 avg_reward += reward
                 state = self.interpret(obs)
         return avg_reward / eval_episodes
-
 
     def _get_exploitation_action(self, state):
         with torch.no_grad():
@@ -274,7 +280,6 @@ class DdpgBase:
         reward_plot.set_ydata([])
 
         return reward_plot
-
 
     def _update_plot(plot, timestep, eval_reward):
         # Append values to axis then render

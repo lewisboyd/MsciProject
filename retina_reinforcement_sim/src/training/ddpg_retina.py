@@ -1,4 +1,5 @@
 import cPickle as pickle
+import numpy as np
 import torch
 import torchvision.transforms as T
 
@@ -6,6 +7,7 @@ import cortex
 import cortex_cuda
 import retina_cuda
 from ddpg_cnn import DdpgCnn
+
 
 class DdpgRetina(DdpgCnn):
     """DDPG agent with built in retina."""
@@ -18,7 +20,7 @@ class DdpgRetina(DdpgCnn):
         Args:
             image_size (int tuple): (height, width) of observation images
         """
-        DdpgCnn.__init__(memory_capacity, batch_size, noise_function,
+        DdpgCnn.__init__(self, memory_capacity, batch_size, noise_function,
                          init_noise, final_noise, exploration_len, num_images,
                          num_actions, reward_scale)
 
@@ -27,24 +29,27 @@ class DdpgRetina(DdpgCnn):
 
         # Create transform function to prepare image for retina
         self.pre_retina_transform = T.Compose([
-                                               T.ToPILImage(),
-                                               T.Grayscale(),
-                                               T.ToTensor()
+            T.ToPILImage(),
+            T.Grayscale(),
+            T.ToTensor()
         ])
 
         # Create transform to resize cortical image
         self.post_retina_transform = T.Compose([
-                                                T.ToPILImage(),
-                                                T.Resize((64,64)),
-                                                T.ToTensor()
+            T.ToPILImage(),
+            T.Resize((64, 64)),
+            T.ToTensor()
         ])
 
     def interpet(self, obs):
         state_tensor = torch.ones((self.num_images, 64, 64)).to(self.device)
         for i in range(self.num_images):
-            cortical_img = self.ret(self.pre_retina_transform(obs[i]))
-            state_tensor[i] = self.post_retina_transform(cortical_img)
+            gray_img = self.pre_retina_transform(obs[i])
+            cortical_img = self.ret.sample(gray_img.squeeze().numpy())
+            state_tensor[i] = self.post_retina_transform(
+                np.expand_dims(cortical_img, 2))
         return state_tensor
+
 
 class Retina:
     """GPU Retina to sample images."""
@@ -54,7 +59,8 @@ class Retina:
 
         Args:
             height (int): height of image
-            width (int): width of image"""
+            width (int): width of image
+        """
         # Load in data
         retina_path = '/home/lewis/Downloads/RetinaCUDA-master/Retinas'
         with open(retina_path + '/ret50k_loc.pkl', 'rb') as handle:
@@ -67,7 +73,8 @@ class Retina:
         L_loc, R_loc = cortex.cort_map(L, R)
         L_loc, R_loc, G, cort_size = cortex.cort_prepare(L_loc, R_loc)
         self.ret = retina_cuda.create_retina(
-            loc50k, coeff50k, (width, height), (int(height / 2), int(width / 2))
+            loc50k, coeff50k, (width, height), (int(
+                height / 2), int(width / 2))
         )
         self.cort = cortex_cuda.create_cortex_from_fields_and_locs(
             L, R, L_loc, R_loc, cort_size, gauss100=G, rgb=False

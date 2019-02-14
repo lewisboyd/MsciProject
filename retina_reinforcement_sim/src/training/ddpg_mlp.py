@@ -20,9 +20,9 @@ class DdpgMlp(DdpgBase):
             action_dim (int) : Number of action ouputs
         """
         DdpgBase.__init__(self, memory_capacity, batch_size, noise_function,
-                      init_noise, final_noise, exploration_len,
-                      Actor, [state_dim, action_dim], Critic,
-                      [state_dim, action_dim], reward_scale)
+                          init_noise, final_noise, exploration_len,
+                          Actor, [state_dim, action_dim], Critic,
+                          [state_dim, action_dim], reward_scale)
 
     def interpret(self, obs):
         return torch.tensor(obs, dtype=torch.float).to(self.device)
