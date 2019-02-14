@@ -61,8 +61,8 @@ class DdpgBase:
         raise NotImplementedError("Implement in child class.")
 
     def train(self, env, init_explore, max_episodes, max_steps,
-              model_folder, data_folder, plot_ylim=[-200, 0], eval_freq=100,
-              eval_ep=10):
+              model_folder, result_folder, data_folder=None,
+              plot_ylim=[-200, 0], eval_freq=100, eval_ep=10):
         """Train the agent.
 
         Args:
@@ -72,7 +72,8 @@ class DdpgBase:
             max_episodes (int): Maximum number of training episodes.
             max_steps (int): Maximum number of steps in one episode.
             model_folder (path): Folder to save models in during training.
-            data_folder (path): Folder to save evaluation data.
+            result_folder (path): Folder to save evaluation data.
+            data_folder (path): If specified load to populate replay buffer.
             plot_ylim (array): Min and max value for episode reward axis.
             eval_freq (int): How many episodes of training before next
                              evaluation.
@@ -81,11 +82,22 @@ class DdpgBase:
         # Create folders for saving data
         if not os.path.isdir(model_folder):
             os.makedirs(model_folder)
-        if not os.path.isdir(data_folder):
-            os.makedirs(data_folder)
+        if not os.path.isdir(result_folder):
+            os.makedirs(result_folder)
 
         # Create interactive plot
         reward_plot = self._create_plot(max_episodes, max_steps, plot_ylim)
+
+        # If given a data folder prepopulate the experience replay
+        if data_folder not None:
+            states = torch.load(data_folder + "states")
+            actions = torch.load(data_folder + "actions")
+            next_states = torch.load(data_folder + "next_states")
+            rewards = torch.load(data_folder + "rewards")
+            done = torch.load(data_folder + "dones")
+            for i in range(states.size(0)):
+                self.memory.push(states[i], actions[i], next_states[i],
+                                 rewards[i], done[i])
 
         start = time.time()
 
@@ -156,10 +168,10 @@ class DdpgBase:
                 print "Evaluation Reward: %f" % eval_reward
 
         # Save figure and data
-        plt.savefig(data_folder + "training_performance.png")
-        reward_plot.get_xdata().tofile(data_folder
+        plt.savefig(result_folder + "training_performance.png")
+        reward_plot.get_xdata().tofile(result_folder
                                        + "eval_timesteps.txt")
-        reward_plot.get_ydata().tofile(data_folder
+        reward_plot.get_ydata().tofile(result_folder
                                        + "eval_rewards.txt")
 
         # Close figure and environment

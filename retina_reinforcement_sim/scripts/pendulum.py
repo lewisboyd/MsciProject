@@ -10,6 +10,8 @@ if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 500
     MAX_STEPS = 200
+    DATA_FOLDER = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
     MAX_EPISODES_LOW = 400
@@ -44,11 +46,11 @@ if __name__ == '__main__':
         os.path.realpath(__file__)) + "/pendulum/state_dicts/pixel/")
     MODEL_FOLDER_RETINA = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/state_dicts/retina/")
-    DATA_FOLDER_NORMAL = (os.path.dirname(os.path.realpath(__file__))
+    RESULT_FOLDER_NORMAL = (os.path.dirname(os.path.realpath(__file__))
                           + "/pendulum/results/low_dim/")
-    DATA_FOLDER_PIXEL = (os.path.dirname(os.path.realpath(__file__))
+    RESULT_FOLDER_PIXEL = (os.path.dirname(os.path.realpath(__file__))
                          + "/pendulum/results/pixel/")
-    DATA_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
+    RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
                           + "/pendulum/results/retina/")
 
     # Train DDPG agent on pendulum low state dimension
@@ -57,7 +59,7 @@ if __name__ == '__main__':
     #                 ACTION_DIM, REWARD_SCALE)
     # environment = PendulumLow()
     # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-    #             MODEL_FOLDER_NORMAL, DATA_FOLDER_NORMAL,
+    #             MODEL_FOLDER_NORMAL, RESULT_FOLDER_NORMAL,
     #             eval_freq=EVAL_FREQ_LOW)
 
     # Create Pendulum environment returning 3 images
@@ -68,11 +70,11 @@ if __name__ == '__main__':
                     INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, NUM_IMAGES,
                     ACTION_DIM, REWARD_SCALE)
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-                MODEL_FOLDER_PIXEL, DATA_FOLDER_PIXEL, [-4700, 0])
+                MODEL_FOLDER_PIXEL, RESULT_FOLDER_PIXEL, [-4700, 0])
 
     # Train DDPG agent using retina
     # agent = DdpgRetina(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
     #                    INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
     #                    NUM_IMAGES, ACTION_DIM, REWARD_SCALE, IMAGE_SIZE)
     # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-    #             MODEL_FOLDER_PIXEL, DATA_FOLDER_RETINA, [-4700, 0])
+    #             MODEL_FOLDER_PIXEL, RESULT_FOLDER_RETINA, [-4700, 0])
