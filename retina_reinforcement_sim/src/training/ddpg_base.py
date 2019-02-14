@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional as F
+import matplotlib.pyplot as plt
 
 from memory import ReplayMemory
 
@@ -77,10 +78,10 @@ class DdpgBase:
         if not os.path.isdir(data_folder):
             os.makedirs(data_folder)
 
-        start = time.time()
-
         # Create interactive plot
-        reward_plot = _create_plot(max_episodes, max_steps, plot_ylim)
+        reward_plot = self._create_plot(max_episodes, max_steps, plot_ylim)
+
+        start = time.time()
 
         # Populate replay buffer using noise function
         for _ in range(init_explore):
@@ -107,8 +108,8 @@ class DdpgBase:
                 state = new_state
 
         # Evaluate initial performance
-        eval_reward = _evaluate(env, max_steps, eval_ep)
-        _update_plot(reward_plot, 0, eval_reward)
+        eval_reward = self._evaluate(env, max_steps, eval_ep)
+        self._update_plot(reward_plot, 0, eval_reward)
         print "Initial Performance: %f" % eval_reward
 
         # Train models
@@ -142,8 +143,8 @@ class DdpgBase:
 
             # Evaluate performance and save agent every 100 episodes
             if ep % eval_freq == 0:
-                eval_reward = _evaluate(env, max_steps, eval_ep)
-                _update_plot(reward_plot, ep * max_steps, eval_reward)
+                eval_reward = self._evaluate(env, max_steps, eval_ep)
+                self._update_plot(reward_plot, ep * max_steps, eval_reward)
                 self._save(model_folder, str(ep))
                 print "Evaluation Reward: %f" % eval_reward
 

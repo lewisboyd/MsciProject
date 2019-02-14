@@ -40,6 +40,9 @@ class Pendulum:
 
 
 if __name__ == '__main__':
+    # Variables
+    SIZE = 100000
+
     # Create folder to save data
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
@@ -58,18 +61,18 @@ if __name__ == '__main__':
 
     # Create tensors for storing data
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    images = torch.ones((100000, 3, 64, 64), dtype=torch.float, device=device)
-    next_images = torch.ones((100000, 3, 64, 64), dtype=torch.float,
+    images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float, device=device)
+    next_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
                              device=device)
-    retina_images = torch.ones((100000, 3, 64, 64), dtype=torch.float,
+    retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
                                device=device)
-    next_retina_images = torch.ones((100000, 3, 64, 64), dtype=torch.float,
+    next_retina_images = torch.ones((SIZE, 3, 64, 64), dtype=torch.float,
                                device=device)
-    states = torch.ones((100000, 3), dtype=torch.float, device=device)
-    next_states = torch.ones((100000, 3), dtype=torch.float, device=device)
-    actions = torch.ones((100000, 1), dtype=torch.float, device=device)
-    rewards = torch.ones((100000, 1), dtype=torch.float, device=device)
-    dones = torch.ones((100000, 1), dtype=torch.float, device=device)
+    states = torch.ones((SIZE, 3), dtype=torch.float, device=device)
+    next_states = torch.ones((SIZE, 3), dtype=torch.float, device=device)
+    actions = torch.ones((SIZE, 1), dtype=torch.float, device=device)
+    rewards = torch.ones((SIZE, 1), dtype=torch.float, device=device)
+    dones = torch.ones((SIZE, 1), dtype=torch.float, device=device)
 
     # Populate tensors
     for ep in range(500):
