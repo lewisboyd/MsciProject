@@ -14,19 +14,22 @@ class DdpgCnn(DdpgBase):
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
                  final_noise, exploration_len, reward_scale, num_images,
-                 num_actions, preprocessor=ImagePreprocessor(num_images)):
+                 num_actions, preprocessor=None):
         """Initialise agent.
 
         Args:
             num_images (int): Number of images in the observation
             num_actions (int): Number of possible actions
         """
-        actor = Actor(num_images, num_actions).to(self.device)
+        actor = Actor(num_images, num_actions).cuda()
         actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-        critic = Critic(num_images, num_actions).to(self.device)
+        critic = Critic(num_images, num_actions).cuda()
         critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
                                         weight_decay=0.01)
+
+        if preprocessor is None:
+            preprocessor = ImagePreprocessor(num_images)
 
         DdpgBase.__init__(self, memory_capacity, batch_size, noise_function,
                           init_noise, final_noise, exploration_len,

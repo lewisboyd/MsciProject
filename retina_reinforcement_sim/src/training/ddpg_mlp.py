@@ -20,10 +20,10 @@ class DdpgMlp(DdpgBase):
             state_dim (int) : Number of state inputs
             action_dim (int) : Number of action ouputs
         """
-        actor = Actor(state_dim, action_dim).to(self.device)
+        actor = Actor(state_dim, action_dim).cuda()
         actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-        critic = Critic(state_dim, action_dim).to(self.device)
+        critic = Critic(state_dim, action_dim).cuda()
         critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
                                         weight_decay=0.01)
 

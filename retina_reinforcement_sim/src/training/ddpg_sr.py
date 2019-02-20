@@ -7,6 +7,7 @@ import torch.nn.functional as F
 
 from ddpg_base import DdpgBase
 from model import FeatureExtractor
+from preprocessor import ImagePreprocessor
 
 
 class DdpgSr(DdpgBase):
@@ -14,7 +15,7 @@ class DdpgSr(DdpgBase):
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
                  final_noise, exploration_len, reward_scale, sr_net, sr_size,
-                 num_actions, preprocessor=ImagePreprocessor(num_images)):
+                 num_actions, preprocessor):
         """Initialise agent.
 
         Args:
@@ -23,10 +24,11 @@ class DdpgSr(DdpgBase):
             sr_size (int): Size of state represenations
             num_actions (int): Number of possible actions
         """
-        actor = Actor(sr_net, num_actions).to(self.device)
+        actor = Actor(sr_net, sr_size, num_actions).cuda()
         actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-        critic = Critic(copy.deepcopy(sr_net), num_actions).to(self.device)
+        critic = Critic(copy.deepcopy(sr_net), sr_size,
+                        num_actions).cuda()
         critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
                                         weight_decay=0.01)
 

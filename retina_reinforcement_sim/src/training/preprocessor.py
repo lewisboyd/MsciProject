@@ -85,11 +85,11 @@ class RetinaPreprocessor:
 
             # Generate cortical image
             cortical_img = self.ret.sample(img.squeeze().numpy())
-            cortical_img = np.expand_dims(cortical_img, 2))
+            cortical_img = np.expand_dims(cortical_img, 2)
 
             # Resize image
             cortical_img = T.functional.to_pil_image(cortical_img)
-            cortical_img = T.functional.resize(cortical_img, (64,64))
+            cortical_img = T.functional.resize(cortical_img, (64, 64))
             cortical_img = T.functional.to_tensor(cortical_img)
             obs_processed[i] = cortical_img
         return obs

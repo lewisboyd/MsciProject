@@ -14,8 +14,8 @@ class DdpgBase:
     """Base class that implements training loop."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, reward_scale, actor, actor_optim,
-                 critic, critic_optim, preprocessor):
+                 final_noise, exploration_len, reward_scale, actor,
+                 actor_optim, critic, critic_optim, preprocessor):
         """Initialise networks, memory and training params.
 
         Args:
@@ -96,29 +96,31 @@ class DdpgBase:
         # Create interactive plot
         reward_plot = self._create_plot(max_episodes, max_steps, plot_ylim)
 
+        start = time.time()
+
         # If given a data folder prepopulate the experience replay
-        if data_folder not None:
+        if data_folder is not None:
+            print "Loading data from folder: %s" % data_folder
             # Load correct observations based on type of preprocessor
-            if preprocessor.__class__.__name__ == 'Preprocessor:'
+            if self.preprocessor.__class__.__name__ == 'Preprocessor':
                 states = torch.load(data_folder + "states")
                 next_states = torch.load(data_folder + "next_states")
-            else if preprocessor.__class__.__name__ == 'ImagePreprocessor:'
+            elif self.preprocessor.__class__.__name__ == 'ImagePreprocessor':
                 states = torch.load(data_folder + "images")
                 next_states = torch.load(data_folder + "next_images")
-            else if preprocessor.__class__.__name__ == 'RetinaPreprocessor:'
+            elif self.preprocessor.__class__.__name__ == 'RetinaPreprocessor':
                 states = torch.load(data_folder + "retina_images")
                 next_states = torch.load(data_folder + "next_retina_images")
             actions = torch.load(data_folder + "actions")
-            rewards = torch.load(data_folder + "rewards")
-            done = torch.load(data_folder + "dones")
+            rewards = torch.load(data_folder + "rewards") * self.reward_scale
+            dones = torch.load(data_folder + "dones")
             for i in range(states.size(0)):
                 self.memory.push(states[i], actions[i], next_states[i],
-                                 rewards[i], done[i])
-
-        start = time.time()
+                                 rewards[i], dones[i])
 
         # Populate replay buffer using noise function
         for _ in range(init_explore):
+            print "Prepopulating experience replay"
             # Reset noise function and environment
             self.noise_function.reset()
             state = self.preprocessor(env.reset()).to(self.device)
@@ -140,8 +142,8 @@ class DdpgBase:
                 # Update current state
                 state = next_state
 
-
         # Evaluate initial performance
+        print "Evaluating initial performance"
         eval_reward = self._evaluate(env, max_steps, eval_ep)
         self._update_plot(reward_plot, 0, eval_reward)
         print "Initial Performance: %f" % eval_reward
@@ -170,7 +172,7 @@ class DdpgBase:
                 self._optimise()
 
                 # Update current state
-                state = new_state
+                state = next_state
 
             print "Episode: %4d/%4d  Reward: %0.2f" % (
                 ep, max_episodes, ep_reward)
@@ -237,7 +239,7 @@ class DdpgBase:
         self._soft_update(self.critic_target, self.critic)
         self._soft_update(self.actor_target, self.actor)
 
-    def __reward_to_tensor(self, reward):
+    def _reward_to_tensor(self, reward):
         return torch.tensor([reward * self.reward_scale],
                             dtype=torch.float).to(self.device)
 
@@ -287,7 +289,7 @@ class DdpgBase:
             target_param.data.copy_(target_param.data * (1.0 - self.tau)
                                     + param.data * self.tau)
 
-    def _create_plot(max_episodes, max_steps, ylim):
+    def _create_plot(self, max_episodes, max_steps, ylim):
         # Create interactive plot
         plt.ion()
         plt.show(block=False)
@@ -307,7 +309,7 @@ class DdpgBase:
 
         return reward_plot
 
-    def _update_plot(plot, timestep, eval_reward):
+    def _update_plot(self, plot, timestep, eval_reward):
         # Append values to axis then render
         plot.set_xdata(
             np.append(plot.get_xdata(), timestep))

@@ -6,7 +6,8 @@ import gym
 import numpy as np
 import torch
 
-from training import DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
+from training import (ImagePreprocessor, RetinaPreprocessor,
+                      OrnsteinUhlenbeckActionNoise)
 
 
 class Pendulum:
@@ -50,9 +51,9 @@ if __name__ == '__main__':
     if not os.path.isdir(DATA_FOLDER):
         os.makedirs(DATA_FOLDER)
 
-    # Create agents purely for processing images
-    agentCnn = DdpgCnn(0, 0, None, 1, 1, 1, 3, 1, 1)
-    # agentRetina = DdpgRetina(0, 0, None, 1, 1, 1, 3, 1, 1, (500, 500))
+    # Create preprocessors
+    imagePreprocessor = ImagePreprocessor(3)
+    # retinaPreprocessor = RetinaPreprocessor(3, 500, 500)
 
     # Create environment
     env = Pendulum()
@@ -81,8 +82,8 @@ if __name__ == '__main__':
         # Reset noise function and environment
         noise_function.reset()
         obs, state = env.reset()
-        image = agentCnn.interpet(obs)
-        # retina_image = agentRetina.interpet(obs)
+        image = imagePreprocessor(obs).to(device)
+        # retina_image = retinaPreprocessor(obs).to(device)
 
         for step in range(200):
             index += 1
@@ -96,8 +97,8 @@ if __name__ == '__main__':
             done = 0 if step == 199 else 1
 
             # Get next image and retina image
-            next_image = agentCnn.interpet(next_obs)
-            # next_retina_image = agentRetina.interpet(next_obs)
+            next_image = imagePreprocessor(next_obs).to(device)
+            # next_retina_image = retinaPreprocessor(next_obs).to(device)
 
             # Normalise state to between -1, 1
             state[2] = state[2] / 8
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     torch.save(next_states, DATA_FOLDER + "next_states")
     torch.save(actions, DATA_FOLDER + "actions")
     torch.save(rewards, DATA_FOLDER + "rewards")
-    torch.save(done, DATA_FOLDER + "dones")
+    torch.save(dones, DATA_FOLDER + "dones")
 
     # Close environment
     env.close()
