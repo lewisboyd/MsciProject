@@ -3,12 +3,13 @@
 import os
 
 from environment import PendulumPixel, PendulumLow
-from training import DdpgMlp, DdpgCnn, DdpgRetina, OrnsteinUhlenbeckActionNoise
+from training import (DdpgMlp, DdpgCnn, OrnsteinUhlenbeckActionNoise,
+                      RetinaPreprocessor)
 
 
 if __name__ == '__main__':
     # Training variables
-    INIT_EXPLORE = 500
+    INIT_EXPLORE = 0
     MAX_STEPS = 200
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
@@ -53,6 +54,14 @@ if __name__ == '__main__':
     RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
                           + "/pendulum/results/retina/")
 
+    # Path to state_dict for state represenation net
+    SR_STATE_DICT = (os.path.dirname(os.path.realpath(__file__))
+                    + "/pendulum/state_dicts/pixel_supervised/net_100")
+
+    # Path to folder containing data for experience replay
+    DATA_FOLDER = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/data/")
+
     # Train DDPG agent on pendulum low state dimension
     # agent = DdpgMlp(REPLAY_SIZE, BATCH_SIZE_LOW, NOISE_FUNCTION, INIT_NOISE,
     #                 FINAL_NOISE, EXPLORATION_LEN_LOW, STATE_DIM_LOW,
@@ -66,15 +75,26 @@ if __name__ == '__main__':
     environment = PendulumPixel()
 
     # Train DDPG agent using CNN
-    agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
-                    INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL, NUM_IMAGES,
-                    ACTION_DIM, REWARD_SCALE)
-    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-                MODEL_FOLDER_PIXEL, RESULT_FOLDER_PIXEL, [-4700, 0])
+    # agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
+    #                 INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
+    #                 REWARD_SCALE, NUM_IMAGES, ACTION_DIM)
+    # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
+    #             MODEL_FOLDER_PIXEL, RESULT_FOLDER_PIXEL, [-4700, 0])
 
     # Train DDPG agent using retina
-    # agent = DdpgRetina(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
-    #                    INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
-    #                    NUM_IMAGES, ACTION_DIM, REWARD_SCALE, IMAGE_SIZE)
+    # preprocessor = RetinaPreprocessor(*image_size)
+    # agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
+    #                 INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
+    #                 REWARD_SCALE, NUM_IMAGES, ACTION_DIM, preprocessor)
     # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
     #             MODEL_FOLDER_PIXEL, RESULT_FOLDER_RETINA, [-4700, 0])
+
+    # Train DDPG agent using state representation net
+    sr_net = FeatureExtractor(NUM_IMAGES, STATE_DIM_LOW)
+    sr_net.load_state_dict(torch.load(SR_STATE_DICT))
+    agent = DdpgSr(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
+                   FINAL_NOISE, EXPLORATION_LEN_PIXEL, REWARD_SCALE, sr_net,
+                   STATE_DIM_LOW, ACTION_DIM)
+    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
+                MODEL_FOLDER_PIXEL, RESULT_FOLDER_RETINA, DATA_FOLDER,
+                [-4700, 0], EVAL_FREQ_LOW)

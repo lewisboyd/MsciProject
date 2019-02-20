@@ -6,40 +6,32 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 
 from ddpg_base import DdpgBase
+from preprocessor import ImagePreprocessor
 
 
 class DdpgCnn(DdpgBase):
     """DDPG agent using a CNN."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, num_images, num_actions,
-                 reward_scale):
+                 final_noise, exploration_len, reward_scale, num_images,
+                 num_actions, preprocessor=ImagePreprocessor(num_images)):
         """Initialise agent.
 
         Args:
             num_images (int): Number of images in the observation
             num_actions (int): Number of possible actions
         """
+        actor = Actor(num_images, num_actions).to(self.device)
+        actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
+
+        critic = Critic(num_images, num_actions).to(self.device)
+        critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
+                                        weight_decay=0.01)
+
         DdpgBase.__init__(self, memory_capacity, batch_size, noise_function,
                           init_noise, final_noise, exploration_len,
-                          Actor, [num_images, num_actions],
-                          Critic, [num_images, num_actions], reward_scale)
-
-        self.num_images = num_images
-
-        # Create transform function to prepare an image for the models
-        self.transform = T.Compose([
-            T.ToPILImage(),
-            T.Grayscale(),
-            T.Resize((64, 64)),
-            T.ToTensor()
-        ])
-
-    def interpet(self, obs):
-        state_tensor = torch.ones((self.num_images, 64, 64)).to(self.device)
-        for i in range(self.num_images):
-            state_tensor[i] = self.transform(obs[i])
-        return state_tensor
+                          reward_scale, actor, actor_optim, critic,
+                          critic_optim, preprocessor)
 
 
 class Actor(nn.Module):
@@ -81,10 +73,10 @@ class Actor(nn.Module):
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, batch):
-        """Generate action policy for the batch of states.
+        """Generate action policy for the batch of observations.
 
         Args:
-            batch (float tensor) : Batch of states
+            batch (float tensor) : Batch of observations
 
         Returns:
             float tensor : Batch of action policies
@@ -139,20 +131,20 @@ class Critic(nn.Module):
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, state_batch, action_batch):
-        """Generate Q-values for the batch of states and actions pairs.
+        """Generate Q-values for the batch of observations and actions pairs.
 
         Args:
-            state_batch (float tensor) : Batch of states
+            obs_batch (float tensor) : Batch of observations
             action_batch (float tensor) : Batch of actions
 
         Returns:
             float tensor : Batch of Q-values
 
         """
-        x = F.relu(self.conv1(state_batch))
+        x = F.relu(self.conv1(obs_batch))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
-        x = x.view(state_batch.size(0), 1024)
+        x = x.view(obs_batch.size(0), 1024)
         x = F.relu(self.fc1(x))
         x = torch.cat((x, action_batch), 1)
         x = F.relu(self.fc2(x))

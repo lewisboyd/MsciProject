@@ -1,51 +1,55 @@
 import math
+import copy
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ddpg_base import DdpgBase
-from preprocessor import Preprocessor
+from model import FeatureExtractor
 
 
-class DdpgMlp(DdpgBase):
-    """DDPG agent using low dimensional state descriptor."""
+class DdpgSr(DdpgBase):
+    """DDPG agent using a state representation network."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, reward_scale, state_dim,
-                 action_dim):
+                 final_noise, exploration_len, reward_scale, sr_net, sr_size,
+                 num_actions, preprocessor=ImagePreprocessor(num_images)):
         """Initialise agent.
 
         Args:
-            state_dim (int) : Number of state inputs
-            action_dim (int) : Number of action ouputs
+            sr_net (object): Network to generate state represenations from
+                             observations
+            sr_size (int): Size of state represenations
+            num_actions (int): Number of possible actions
         """
-        actor = Actor(state_dim, action_dim).to(self.device)
+        actor = Actor(sr_net, num_actions).to(self.device)
         actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-        critic = Critic(state_dim, action_dim).to(self.device)
+        critic = Critic(copy.deepcopy(sr_net), num_actions).to(self.device)
         critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
                                         weight_decay=0.01)
 
         DdpgBase.__init__(self, memory_capacity, batch_size, noise_function,
                           init_noise, final_noise, exploration_len,
                           reward_scale, actor, actor_optim, critic,
-                          critic_optim, Preprocessor())
+                          critic_optim, preprocessor)
 
 
 class Actor(nn.Module):
     """Represents an Actor in the Actor to Critic Model."""
 
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, sr_net, sr_size, action_dim):
         """Initialise layers.
 
-        Args:
-            state_dim (int) : Number of state inputs
-            action_dim (int) : Number of action ouputs
+        Args
+            state_dim (int): Number of state inputs
+            action_dim (int): Number of action ouputs
         """
         # Create network
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 400)
+        self.sr_net = sr_net
+        self.fc1 = nn.Linear(sr_size, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, action_dim)
 
@@ -59,16 +63,17 @@ class Actor(nn.Module):
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
     def forward(self, batch):
-        """Generate action policy for the batch of states.
+        """Generate action policy for the batch of observations.
 
         Args:
-            batch (float tensor) : Batch of states
+            batch (float tensor) : Batch of observations
 
         Returns:
             float tensor : Batch of action policies
 
         """
-        x = F.relu(self.fc1(batch))
+        x = self.sr_net(batch)
+        x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x).tanh()
         return x
@@ -77,7 +82,7 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     """Represents a Critic in the Actor to Critic Model."""
 
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, sr_net, sr_size, action_dim):
         """Initialise layers.
 
         Args:
@@ -87,7 +92,8 @@ class Critic(nn.Module):
         """
         # Create network
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 400)
+        self.sr_net = sr_net
+        self.fc1 = nn.Linear(sr_size, 400)
         self.fc2 = nn.Linear(400 + action_dim, 300)
         self.fc3 = nn.Linear(300, 1)
 
@@ -100,7 +106,7 @@ class Critic(nn.Module):
                          1 / math.sqrt(fan_in))
         nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
 
-    def forward(self, state_batch, action_batch):
+    def forward(self, obs_batch, action_batch):
         """Generate Q-values for the batch of states and actions pairs.
 
         Args:
@@ -111,7 +117,8 @@ class Critic(nn.Module):
             float tensor : Batch of Q-values
 
         """
-        x = F.relu(self.fc1(state_batch))
+        x = self.sr_net(obs_batch)
+        x = F.relu(self.fc1(x))
         x = torch.cat((x, action_batch), 1)
         x = F.relu(self.fc2(x))
         x = self.fc3(x)

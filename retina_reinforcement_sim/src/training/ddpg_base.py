@@ -1,5 +1,6 @@
 import os
 import time
+import copy
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,8 +14,8 @@ class DdpgBase:
     """Base class that implements training loop."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
-                 final_noise, exploration_len, actor, actor_args, critic,
-                 critic_args, reward_scale):
+                 final_noise, exploration_len, reward_scale, actor, actor_optim,
+                 critic, critic_optim, preprocessor):
         """Initialise networks, memory and training params.
 
         Args:
@@ -25,40 +26,47 @@ class DdpgBase:
             init_noise (double) : Initial amount of noise to be added
             final_noise (double) : Final amount of noise to be added
             exploration_len (int) : Number of steps to decay noise over
-            actor (object): Actor constructor to use
-            actor_args (array): Args for actor constructor
-            critic (object): Critic constructor to use
-            critic_args (array): Args for critic constructor
             reward_scale (float): Rescales received rewards
+            actor (object): Actor network
+            actor_optim (array): Optimiser for actor
+            critic (object): Critic network
+            critic_optimm (array): Optimiser for critic
+            preprocessor (object): Function to process environment observation
         """
+        # Experience Replay
         self.memory = ReplayMemory(memory_capacity)
-        self.batch_size = batch_size
+
+        # Noise function and variables
         self.noise_function = noise_function
         self.noise = init_noise
         self.final_noise = final_noise
         self.noise_decay = (init_noise - final_noise) / exploration_len
+
+        # Training variables
+        self.batch_size = batch_size
         self.tau = 0.001
         self.discount = 0.99
         self.reward_scale = reward_scale
+
+        # Function to process environment observation before use by models
+        self.preprocessor = preprocessor
+
+        # Device to run on
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else
                                    "cpu")
 
-        # Create actor networks
-        self.actor = actor(*actor_args).to(self.device)
-        self.actor_target = actor(*actor_args).to(self.device)
-        self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optim = torch.optim.Adam(self.actor.parameters(), 0.0001)
+        # Actor networks and optimiser
+        self.actor = actor
+        self.actor_target = copy.deepcopy(actor).to(self.device)
+        self.actor_optim = actor_optim
+        # self.actor_optim = torch.optim.Adam(self.actor.parameters(), 0.0001)
 
-        # Create critic networks
-        self.critic = critic(*critic_args).to(self.device)
-        self.critic_target = critic(*critic_args).to(self.device)
-        self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001,
-                                             weight_decay=0.01)
-
-    def interpret(self, obs):
-        """Process environment obsevation to get state tensor."""
-        raise NotImplementedError("Implement in child class.")
+        # Critic networks and optimiser
+        self.critic = critic
+        self.critic_target = copy.deepcopy(critic).to(self.device)
+        self.critic_optim = critic_optim
+        # self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001,
+        #                                      weight_decay=0.01)
 
     def train(self, env, init_explore, max_episodes, max_steps,
               model_folder, result_folder, data_folder=None,
@@ -90,9 +98,17 @@ class DdpgBase:
 
         # If given a data folder prepopulate the experience replay
         if data_folder not None:
-            states = torch.load(data_folder + "states")
+            # Load correct observations based on type of preprocessor
+            if preprocessor.__class__.__name__ == 'Preprocessor:'
+                states = torch.load(data_folder + "states")
+                next_states = torch.load(data_folder + "next_states")
+            else if preprocessor.__class__.__name__ == 'ImagePreprocessor:'
+                states = torch.load(data_folder + "images")
+                next_states = torch.load(data_folder + "next_images")
+            else if preprocessor.__class__.__name__ == 'RetinaPreprocessor:'
+                states = torch.load(data_folder + "retina_images")
+                next_states = torch.load(data_folder + "next_retina_images")
             actions = torch.load(data_folder + "actions")
-            next_states = torch.load(data_folder + "next_states")
             rewards = torch.load(data_folder + "rewards")
             done = torch.load(data_folder + "dones")
             for i in range(states.size(0)):
@@ -105,25 +121,25 @@ class DdpgBase:
         for _ in range(init_explore):
             # Reset noise function and environment
             self.noise_function.reset()
-            obs = env.reset()
-            state = self.interpret(obs)
+            state = self.preprocessor(env.reset()).to(self.device)
 
             for step in range(max_steps):
                 # Step using noise value
                 action = torch.tensor(self.noise_function(),
                                       device=self.device,
                                       dtype=torch.float).clamp(-1, 1)
-                new_obs, reward = env.step(action)
+                next_obs, reward = env.step(action)
                 done = step == max_steps - 1
 
                 # Convert to tensors and save
-                new_state = self.interpret(new_obs)
+                next_state = self.preprocessor(next_obs).to(self.device)
                 reward = self._reward_to_tensor(reward)
                 done = self._done_to_tensor(done)
-                self.memory.push(state, action, new_state, reward, done)
+                self.memory.push(state, action, next_state, reward, done)
 
                 # Update current state
-                state = new_state
+                state = next_state
+
 
         # Evaluate initial performance
         eval_reward = self._evaluate(env, max_steps, eval_ep)
@@ -134,22 +150,21 @@ class DdpgBase:
         for ep in range(1, max_episodes + 1):
             # Reset noise function and environment
             self.noise_function.reset()
-            obs = env.reset()
-            state = self.interpret(obs)
+            state = self.preprocessor(env.reset()).to(self.device)
 
             ep_reward = 0.
             for step in range(max_steps):
                 # Step using noisey action
                 action = self._get_exploration_action(state)
-                new_obs, reward = env.step(action)
+                next_obs, reward = env.step(action)
                 done = step == max_steps - 1
                 ep_reward += reward.item()
 
                 # Convert to tensors and save
-                new_state = self.interpret(new_obs)
+                next_state = self.preprocessor(next_obs).to(self.device)
                 reward = self._reward_to_tensor(reward)
                 done = self._done_to_tensor(done)
-                self.memory.push(state, action, new_state, reward, done)
+                self.memory.push(state, action, next_state, reward, done)
 
                 # Optimise agent
                 self._optimise()
@@ -235,13 +250,12 @@ class DdpgBase:
         # Average multiple episode rewards
         avg_reward = 0.
         for _ in range(eval_episodes):
-            obs = env.reset()
-            state = self.interpret(obs)
+            state = self.preprocessor(env.reset()).to(self.device)
             for step in range(max_steps):
                 action = self._get_exploitation_action(state)
-                new_obs, reward = env.step(action)
+                next_obs, reward = env.step(action)
                 avg_reward += reward
-                state = self.interpret(obs)
+                state = self.preprocessor(next_obs).to(self.device)
         return avg_reward / eval_episodes
 
     def _get_exploitation_action(self, state):
