@@ -88,9 +88,9 @@ if __name__ == '__main__':
     agent = Ddpg(REPLAY_SIZE, BATCH_SIZE_LOW, NOISE_FUNCTION, INIT_NOISE,
                  FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
                  actor_optim, critic, critic_optim, preprocessor)
-    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
+    agent.train(environment, 500, MAX_EPISODES_LOW, MAX_STEPS,
                 MODEL_FOLDER_LOW, RESULT_FOLDER_LOW,
-                data_folder=DATA_FOLDER, plot_ylim=[-2000, 0],
+                data_folder=None, plot_ylim=[-2000, 0],
                 eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
     # Create image pendulum environment and its preprocessor
