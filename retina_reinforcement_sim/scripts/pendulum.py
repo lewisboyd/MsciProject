@@ -15,17 +15,17 @@ from training import (Ddpg, OrnsteinUhlenbeckActionNoise,
 if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 0
-    MAX_STEPS = 10
+    MAX_STEPS = 200
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
-    MAX_EPISODES_LOW = 5
-    EVAL_FREQ_LOW = 5
+    MAX_EPISODES_LOW = 100
+    EVAL_FREQ_LOW = 1
 
     # Training variables image
-    MAX_EPISODES_IMAGE = 5
-    EVAL_FREQ_IMAGE = 20
+    MAX_EPISODES_IMAGE = 1000
+    EVAL_FREQ_IMAGE = 10
 
     # Agent variables
     REPLAY_SIZE = 100000
