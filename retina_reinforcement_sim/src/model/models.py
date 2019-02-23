@@ -1,86 +1,297 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Actor(nn.Module):
-    """Represents an Actor in the Actor to Critic Model.
+class ActorSr(nn.Module):
+    """Represents an Actor in the Actor to Critic Model."""
 
-    The Actor takes in a cortical image (state) and outputs 3 values between -1
-    and 1 for the found_centre action, move_wrist_action and move_elbow action
-    respectively.
-
-    """
-
-    def __init__(self, feature_extractor, num_features):
+    def __init__(self, sr_net, sr_size, action_dim):
         """Initialise layers.
 
-        Args:
-            feature_extractor (model) : The model to use to extract image
-                                        features
-            num_features (int) : Number of features the extractor will return
-
+        Args
+            state_dim (int): Number of state inputs
+            action_dim (int): Number of action ouputs
         """
-        super(Actor, self).__init__()
-        self.feature_extractor = feature_extractor
-        self.fc1 = nn.Linear(num_features, 512)
-        self.fc2 = nn.Linear(512, 3)
-        self.head = nn.Tanh()
+        # Create network
+        super(ActorSr, self).__init__()
+        self.sr_net = sr_net
+        self.fc1 = nn.Linear(sr_size, 400)
+        self.fc2 = nn.Linear(400, 300)
+        self.fc3 = nn.Linear(300, action_dim)
 
-    def forward(self, image):
-        """Pass the image through the network.
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, batch):
+        """Generate action policy for the batch of observations.
 
         Args:
-            image (float tensor) : RGB cortical image
+            batch (float tensor) : Batch of observations
 
         Returns:
-            float tensor: found_centre, move_wrist and move_elbow policy
+            float tensor : Batch of action policies
 
         """
-        x = self.feature_extractor(image)
-        x = x.view(x.size(0), -1)
+        x = self.sr_net(batch)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.head(x)
+        x = self.fc3(x).tanh()
         return x
 
 
-class Critic(nn.Module):
-    """Represents a Critic in the Actor to Critic Model.
+class CriticSr(nn.Module):
+    """Represents a Critic in the Actor to Critic Model."""
 
-    The Critic takes in a cortical image (state) and the 3 action values to
-    output the expected value of carrying out the action in the state.
-
-    """
-
-    def __init__(self, feature_extractor, num_features):
+    def __init__(self, sr_net, sr_size, action_dim):
         """Initialise layers.
 
         Args:
-            feature_extractor (model) : The model to use to extract image
-                                        features
-            num_features (int) : Number of features the extractor will return
+            state_dim (int) : Number of state inputs
+            action_dim (int) : Number of action ouputs
 
         """
-        super(Critic, self).__init__()
-        self.feature_extractor = feature_extractor
-        self.fc1 = nn.Linear(num_features + 3, 512)
-        self.head = nn.Linear(512, 1)
+        # Create network
+        super(CriticSr, self).__init__()
+        self.sr_net = sr_net
+        self.fc1 = nn.Linear(sr_size, 400)
+        self.fc2 = nn.Linear(400 + action_dim, 300)
+        self.fc3 = nn.Linear(300, 1)
 
-    def forward(self, image, action):
-        """Pass the image and actions through the network.
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, obs_batch, action_batch):
+        """Generate Q-values for the batch of states and actions pairs.
 
         Args:
-            image (float tensor) : RGB cortical image
-            action (float tensor) : The 3 action values
+            state_batch (float tensor) : Batch of states
+            action_batch (float tensor) : Batch of actions
 
         Returns:
-            float tensor : value of the action values in the state
+            float tensor : Batch of Q-values
 
         """
-        x = self.feature_extractor(image)
-        x = x.view(x.size(0), -1)
-        x = torch.cat((x, action), 1)
+        x = self.sr_net(obs_batch)
         x = F.relu(self.fc1(x))
-        x = self.head(x)
+        x = torch.cat((x, action_batch), 1)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+
+class ActorCnn(nn.Module):
+    """Represents an Actor in the Actor to Critic Model."""
+
+    def __init__(self, num_images, num_actions):
+        """Initialise layers.
+
+        Args:
+            num_images (int) : Number of greyscale images
+            num_actions (int) : Number of actions
+
+        """
+        # Create network
+        super(ActorCnn, self).__init__()
+        self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
+        self.conv2 = nn.Conv2d(32, 64, 4, 2)
+        self.conv3 = nn.Conv2d(64, 64, 3)
+        self.fc1 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, num_actions)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
+        nn.init.uniform_(self.conv1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv2.weight)
+        nn.init.uniform_(self.conv2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv3.weight)
+        nn.init.uniform_(self.conv3.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, batch):
+        """Generate action policy for the batch of observations.
+
+        Args:
+            batch (float tensor) : Batch of observations
+
+        Returns:
+            float tensor : Batch of action policies
+
+        """
+        x = F.relu(self.conv1(batch))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(batch.size(0), 1024)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x).tanh()
+        return x
+
+
+class CriticCnn(nn.Module):
+    """Represents a Critic in the Actor to Critic Model."""
+
+    def __init__(self, num_images, num_actions):
+        """Initialise layers.
+
+        Args:
+            num_images (int) : Number of greyscale images
+            num_actions (int) : Number of actions
+
+        """
+        # Create network
+        super(CriticCnn, self).__init__()
+        self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
+        self.conv2 = nn.Conv2d(32, 64, 4, 2)
+        self.conv3 = nn.Conv2d(64, 64, 3)
+        self.fc1 = nn.Linear(1024, 512)
+        self.fc2 = nn.Linear(512 + num_actions, 256)
+        self.fc3 = nn.Linear(256, 1)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
+        nn.init.uniform_(self.conv1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv2.weight)
+        nn.init.uniform_(self.conv2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv3.weight)
+        nn.init.uniform_(self.conv3.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, obs_batch, action_batch):
+        """Generate Q-values for the batch of observations and actions pairs.
+
+        Args:
+            obs_batch (float tensor) : Batch of observations
+            action_batch (float tensor) : Batch of actions
+
+        Returns:
+            float tensor : Batch of Q-values
+
+        """
+        x = F.relu(self.conv1(obs_batch))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(obs_batch.size(0), 1024)
+        x = F.relu(self.fc1(x))
+        x = torch.cat((x, action_batch), 1)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+
+class ActorMlp(nn.Module):
+    """Represents an Actor in the Actor to Critic Model."""
+
+    def __init__(self, state_dim, action_dim):
+        """Initialise layers.
+
+        Args:
+            state_dim (int) : Number of state inputs
+            action_dim (int) : Number of action ouputs
+        """
+        # Create network
+        super(ActorMlp, self).__init__()
+        self.fc1 = nn.Linear(state_dim, 400)
+        self.fc2 = nn.Linear(400, 300)
+        self.fc3 = nn.Linear(300, action_dim)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, batch):
+        """Generate action policy for the batch of states.
+
+        Args:
+            batch (float tensor) : Batch of states
+
+        Returns:
+            float tensor : Batch of action policies
+
+        """
+        x = F.relu(self.fc1(batch))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x).tanh()
+        return x
+
+
+class CriticMlp(nn.Module):
+    """Represents a Critic in the Actor to Critic Model."""
+
+    def __init__(self, state_dim, action_dim):
+        """Initialise layers.
+
+        Args:
+            state_dim (int) : Number of state inputs
+            action_dim (int) : Number of action ouputs
+
+        """
+        # Create network
+        super(CriticMlp, self).__init__()
+        self.fc1 = nn.Linear(state_dim, 400)
+        self.fc2 = nn.Linear(400 + action_dim, 300)
+        self.fc3 = nn.Linear(300, 1)
+
+        # Initialise weights
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc1.weight)
+        nn.init.uniform_(self.fc1.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.fc2.weight)
+        nn.init.uniform_(self.fc2.weight, -1 / math.sqrt(fan_in),
+                         1 / math.sqrt(fan_in))
+        nn.init.uniform_(self.fc3.weight, -0.0003, 0.0003)
+
+    def forward(self, state_batch, action_batch):
+        """Generate Q-values for the batch of states and actions pairs.
+
+        Args:
+            state_batch (float tensor) : Batch of states
+            action_batch (float tensor) : Batch of actions
+
+        Returns:
+            float tensor : Batch of Q-values
+
+        """
+        x = F.relu(self.fc1(state_batch))
+        x = torch.cat((x, action_batch), 1)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x

@@ -10,7 +10,7 @@ from torch.nn import functional as F
 from memory import ReplayMemory
 
 
-class DdpgBase:
+class Ddpg:
     """Base class that implements training loop."""
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
@@ -59,14 +59,11 @@ class DdpgBase:
         self.actor = actor
         self.actor_target = copy.deepcopy(actor).to(self.device)
         self.actor_optim = actor_optim
-        # self.actor_optim = torch.optim.Adam(self.actor.parameters(), 0.0001)
 
         # Critic networks and optimiser
         self.critic = critic
         self.critic_target = copy.deepcopy(critic).to(self.device)
         self.critic_optim = critic_optim
-        # self.critic_optim = torch.optim.Adam(self.critic.parameters(), 0.001,
-        #                                      weight_decay=0.01)
 
     def train(self, env, init_explore, max_episodes, max_steps,
               model_folder, result_folder, data_folder=None,
@@ -164,7 +161,7 @@ class DdpgBase:
                 ep, max_episodes, ep_reward)
 
             # Evaluate performance and save agent every 100 episodes
-            if ep % eval_freq == 0:
+            if ep % eval_freq == 0 or ep == max_episodes:
                 eval_reward = self._evaluate(env, max_steps, eval_ep)
                 self._update_plot(reward_plot, ep * max_steps, eval_reward)
                 self._save(model_folder, str(ep))

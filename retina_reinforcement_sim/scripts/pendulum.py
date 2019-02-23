@@ -1,28 +1,31 @@
 #!/usr/bin/env python
 
 import os
+import copy
 
 import torch
 
 from environment import PendulumPixel, PendulumLow
-from model import FeatureExtractor
-from training import (DdpgMlp, DdpgCnn, DdpgSr, OrnsteinUhlenbeckActionNoise,
-                      ImagePreprocessor, RetinaPreprocessor)
+from model import (ActorCnn, CriticCnn, ActorSr, CriticSr,
+                   ActorMlp, CriticMlp, FeatureExtractor)
+from training import (Ddpg, OrnsteinUhlenbeckActionNoise,
+                      Preprocessor, ImagePreprocessor)
 
 
 if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 0
-    MAX_STEPS = 200
+    MAX_STEPS = 10
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
-    MAX_EPISODES_LOW = 100
+    MAX_EPISODES_LOW = 5
     EVAL_FREQ_LOW = 5
 
     # Training variables image
-    MAX_EPISODES_PIXEL = 2000
+    MAX_EPISODES_IMAGE = 5
+    EVAL_FREQ_IMAGE = 20
 
     # Agent variables
     REPLAY_SIZE = 100000
@@ -41,90 +44,119 @@ if __name__ == '__main__':
     BATCH_SIZE_IMAGE = 16
     NUM_IMAGES = 3
     IMAGE_SIZE = (500, 500)
-    EXPLORATION_LEN_PIXEL = 100000
+    EXPLORATION_LEN_IMAGE = 100000
 
     # Save paths for state_dicts
-    MODEL_FOLDER_NORMAL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/normal/")
-    MODEL_FOLDER_PIXEL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/pixel/")
+    MODEL_FOLDER_LOW = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/low_dim/")
+    MODEL_FOLDER_CNN = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_pretrained/")
     MODEL_FOLDER_RETINA = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/state_dicts/retina/")
-    MODEL_FOLDER_PIXEL_SR_FROZEN = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/pixel_sr_frozen/")
-    MODEL_FOLDER_PIXEL_SR = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/pixel_sr/")
+    MODEL_FOLDER_CNN_SR_FROZEN = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_sr_frozen/")
+    MODEL_FOLDER_CNN_SR = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_sr/")
 
     # Save paths for performance data
-    RESULT_FOLDER_NORMAL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/normal/")
-    RESULT_FOLDER_PIXEL = (os.path.dirname(os.path.realpath(__file__))
-                           + "/pendulum/results/pixel/")
+    RESULT_FOLDER_LOW = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/results/low_dim/")
+    RESULT_FOLDER_CNN = (os.path.dirname(os.path.realpath(__file__))
+                         + "/pendulum/results/cnn_pretrained/")
     RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
                             + "/pendulum/results/retina/")
-    RESULT_FOLDER_PIXEL_SR_FROZEN = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/pixel_sr_frozen/")
-    RESULT_FOLDER_PIXEL_SR = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/pixel_sr/")
+    RESULT_FOLDER_CNN_SR_FROZEN = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/results/cnn_sr_frozen/")
+    RESULT_FOLDER_CNN_SR = (os.path.dirname(
+        os.path.realpath(__file__)) + "/pendulum/results/cnn_sr/")
 
     # Path to state_dict for state represenation net
     SR_STATE_DICT = (os.path.dirname(os.path.realpath(__file__))
-                     + "/pendulum/state_dicts/pixel_supervised/net_20")
+                     + "/pendulum/state_dicts/sr/net_20")
 
-    # Path to folder containing data for experience replay
-    DATA_FOLDER = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/data/")
-
-    # Create Pendulum environment returning 3 images
+    # Create image pendulum environment and its preprocessor
     environment = PendulumPixel()
-
-    # Train DDPG agent using CNN
-    # agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
-    #                 INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
-    #                 REWARD_SCALE, NUM_IMAGES, ACTION_DIM)
-    # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-    #             MODEL_FOLDER_PIXEL, RESULT_FOLDER_PIXEL, [-5000, 0])
-
-    # Train DDPG agent using retina
-    # preprocessor = RetinaPreprocessor(*image_size)
-    # agent = DdpgCnn(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION,
-    #                 INIT_NOISE, FINAL_NOISE, EXPLORATION_LEN_PIXEL,
-    #                 REWARD_SCALE, NUM_IMAGES, ACTION_DIM, preprocessor)
-    # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_PIXEL, MAX_STEPS,
-    #             MODEL_FOLDER_PIXEL, RESULT_FOLDER_RETINA, [-5000, 0])
-
-    # Train DDPG agent using state represenation net with parameters frozen
     preprocessor = ImagePreprocessor(NUM_IMAGES)
+
+    # DDPG agent using pretrained convolutional layers
+    actor = ActorCnn(NUM_IMAGES, ACTION_DIM).cuda()
+    critic = CriticCnn(NUM_IMAGES, ACTION_DIM).cuda()
+    state_dict = torch.load(SR_STATE_DICT)
+    state_dict.pop("fc1.weight", None)
+    state_dict.pop("fc1.bias", None)
+    state_dict.pop("fc2.weight", None)
+    state_dict.pop("fc2.bias", None)
+    state_dict.pop("fc3.weight", None)
+    state_dict.pop("fc3.bias", None)
+    actor.load_state_dict(state_dict, strict=False)
+    critic.load_state_dict(state_dict, strict=False)
+    del state_dict  # Release memory used
+    actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
+
+    critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
+                                    weight_decay=0.01)
+    agent = Ddpg(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
+                 FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
+                 actor_optim, critic, critic_optim, preprocessor)
+    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_IMAGE, MAX_STEPS,
+                MODEL_FOLDER_CNN, RESULT_FOLDER_CNN,
+                data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
+                eval_freq=EVAL_FREQ_IMAGE, eval_ep=1)
+
+    # DDPG agent using state represenation net with parameters frozen
     sr_net = FeatureExtractor(NUM_IMAGES, STATE_DIM_LOW)
     sr_net.load_state_dict(torch.load(SR_STATE_DICT))
     for param in sr_net.parameters():
         param.requires_grad = False
-    agent = DdpgSr(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
-                   FINAL_NOISE, EXPLORATION_LEN_PIXEL, REWARD_SCALE, sr_net,
-                   STATE_DIM_LOW, ACTION_DIM, preprocessor)
-    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_PIXEL_SR, RESULT_FOLDER_PIXEL_SR,
-                data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
-                eval_freq=EVAL_FREQ_LOW)
+    actor = ActorSr(sr_net, STATE_DIM_LOW, ACTION_DIM).cuda()
+    actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-    # Train DDPG agent using state representation net with parameters trainable
+    critic = CriticSr(copy.deepcopy(sr_net), STATE_DIM_LOW,
+                      ACTION_DIM).cuda()
+    critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
+                                    weight_decay=0.01)
+    agent = Ddpg(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
+                 FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
+                 actor_optim, critic, critic_optim, preprocessor)
+    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
+                MODEL_FOLDER_CNN_SR_FROZEN, RESULT_FOLDER_CNN_SR_FROZEN,
+                data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
+                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
+
+    # DDPG agent using state representation net with parameters trainable
     sr_net.load_state_dict(torch.load(SR_STATE_DICT))
     for param in sr_net.parameters():
         param.requires_grad = True
-    agent = DdpgSr(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
-                   FINAL_NOISE, EXPLORATION_LEN_PIXEL, REWARD_SCALE, sr_net,
-                   STATE_DIM_LOW, ACTION_DIM, preprocessor)
-    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_PIXEL_SR_FROZEN, RESULT_FOLDER_PIXEL_SR_FROZEN,
-                data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
-                eval_freq=EVAL_FREQ_LOW)
+    actor = ActorSr(sr_net, STATE_DIM_LOW, ACTION_DIM).cuda()
+    actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
 
-    # Train DDPG agent on pendulum low state dimension
-    agent = DdpgMlp(REPLAY_SIZE, BATCH_SIZE_LOW, NOISE_FUNCTION, INIT_NOISE,
-                    FINAL_NOISE, EXPLORATION_LEN_LOW, REWARD_SCALE,
-                    STATE_DIM_LOW, ACTION_DIM)
-    environment = PendulumLow()
+    critic = CriticSr(copy.deepcopy(sr_net), STATE_DIM_LOW,
+                      ACTION_DIM).cuda()
+    critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
+                                    weight_decay=0.01)
+    agent = Ddpg(REPLAY_SIZE, BATCH_SIZE_IMAGE, NOISE_FUNCTION, INIT_NOISE,
+                 FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
+                 actor_optim, critic, critic_optim, preprocessor)
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_NORMAL, RESULT_FOLDER_NORMAL,
+                MODEL_FOLDER_CNN_SR, RESULT_FOLDER_CNN_SR,
+                data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
+                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
+
+    # Create low state pendulum environment and its preprocessor
+    environment = PendulumLow()
+    preprocessor = Preprocessor()
+
+    # DDPG agent using low state dimension
+    actor = ActorMlp(STATE_DIM_LOW, ACTION_DIM).cuda()
+    actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
+
+    critic = CriticMlp(STATE_DIM_LOW, ACTION_DIM).cuda()
+    critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
+                                    weight_decay=0.01)
+    agent = Ddpg(REPLAY_SIZE, BATCH_SIZE_LOW, NOISE_FUNCTION, INIT_NOISE,
+                 FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
+                 actor_optim, critic, critic_optim, preprocessor)
+    agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
+                MODEL_FOLDER_LOW, RESULT_FOLDER_LOW,
                 data_folder=DATA_FOLDER, plot_ylim=[-2000, 0],
-                eval_freq=EVAL_FREQ_LOW)
+                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
