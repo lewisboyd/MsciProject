@@ -104,34 +104,35 @@ class DdpgBase:
             self._load_data(data_folder)
 
         # Populate replay buffer using noise function
-        for _ in range(init_explore):
+        if init_explore > 0:
             print "Prepopulating experience replay"
-            # Reset noise function and environment
-            self.noise_function.reset()
-            state = self.preprocessor(env.reset()).to(self.device)
+            for _ in range(init_explore):
+                # Reset noise function and environment
+                self.noise_function.reset()
+                state = self.preprocessor(env.reset()).to(self.device)
 
-            for step in range(max_steps):
-                # Step using noise value
-                action = torch.tensor(self.noise_function(),
-                                      device=self.device,
-                                      dtype=torch.float).clamp(-1, 1)
-                next_obs, reward = env.step(action.cpu())
-                done = step == max_steps - 1
+                for step in range(max_steps):
+                    # Step using noise value
+                    action = torch.tensor(self.noise_function(),
+                                          device=self.device,
+                                          dtype=torch.float).clamp(-1, 1)
+                    next_obs, reward = env.step(action.cpu())
+                    done = step == max_steps - 1
 
-                # Convert to tensors and save
-                next_state = self.preprocessor(next_obs).to(self.device)
-                reward = self._reward_to_tensor(reward)
-                done = self._done_to_tensor(done)
-                self.memory.push(state, action, next_state, reward, done)
+                    # Convert to tensors and save
+                    next_state = self.preprocessor(next_obs).to(self.device)
+                    reward = self._reward_to_tensor(reward)
+                    done = self._done_to_tensor(done)
+                    self.memory.push(state, action, next_state, reward, done)
 
-                # Update current state
-                state = next_state
+                    # Update current state
+                    state = next_state
 
         # Evaluate initial performance
         print "Evaluating initial performance"
         eval_reward = self._evaluate(env, max_steps, eval_ep)
         self._update_plot(reward_plot, 0, eval_reward)
-        print "Initial Performance: %f" % eval_reward
+        print "Initial Performance: %0.2f" % eval_reward
 
         # Train models
         for ep in range(1, max_episodes + 1):
@@ -167,7 +168,7 @@ class DdpgBase:
                 eval_reward = self._evaluate(env, max_steps, eval_ep)
                 self._update_plot(reward_plot, ep * max_steps, eval_reward)
                 self._save(model_folder, str(ep))
-                print "Evaluation Reward: %f" % eval_reward
+                print "Evaluation Reward: %0.2f" % eval_reward
 
         # Save figure and data
         plt.savefig(result_folder + "training_performance.png")

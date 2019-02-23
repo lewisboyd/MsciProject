@@ -32,11 +32,18 @@ class ReplayMemory(object):
 
         """
         if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = (
-            ReplayMemory.Experience(state, action, next_state, reward,
-                                    done))
-        self.position = (self.position + 1) % self.capacity
+            experience = ReplayMemory.Experience(
+                state, action, next_state, reward, done)
+            self.memory.append(experience)
+        else:
+            # Use copy_ instead of creating new experience due to pytorch
+            # not correctly freeing the GPU memory (5x slower but no leak)
+            self.memory[self.position].state.copy_(state)
+            self.memory[self.position].action.copy_(action)
+            self.memory[self.position].next_state.copy_(next_state)
+            self.memory[self.position].reward.copy_(reward)
+            self.memory[self.position].done.copy_(done)
+            self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
         """Return a list of randomly choosen experiences.

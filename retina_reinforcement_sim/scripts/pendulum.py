@@ -18,8 +18,8 @@ if __name__ == '__main__':
         os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
-    MAX_EPISODES_LOW = 200
-    EVAL_FREQ_LOW = 20
+    MAX_EPISODES_LOW = 100
+    EVAL_FREQ_LOW = 5
 
     # Training variables image
     MAX_EPISODES_PIXEL = 2000
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     # Save paths for performance data
     RESULT_FOLDER_NORMAL = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/low_dim/")
+        os.path.realpath(__file__)) + "/pendulum/results/normal/")
     RESULT_FOLDER_PIXEL = (os.path.dirname(os.path.realpath(__file__))
                            + "/pendulum/results/pixel/")
     RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
