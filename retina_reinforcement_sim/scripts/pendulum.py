@@ -18,7 +18,7 @@ if __name__ == '__main__':
         os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
-    MAX_EPISODES_LOW = 400
+    MAX_EPISODES_LOW = 200
     EVAL_FREQ_LOW = 20
 
     # Training variables image

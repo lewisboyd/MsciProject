@@ -101,22 +101,7 @@ class DdpgBase:
         # If given a data folder prepopulate the experience replay
         if data_folder is not None:
             print "Loading data from folder: %s" % data_folder
-            # Load correct observations based on type of preprocessor
-            if self.preprocessor.__class__.__name__ == 'Preprocessor':
-                states = torch.load(data_folder + "states")
-                next_states = torch.load(data_folder + "next_states")
-            elif self.preprocessor.__class__.__name__ == 'ImagePreprocessor':
-                states = torch.load(data_folder + "images")
-                next_states = torch.load(data_folder + "next_images")
-            elif self.preprocessor.__class__.__name__ == 'RetinaPreprocessor':
-                states = torch.load(data_folder + "retina_images")
-                next_states = torch.load(data_folder + "next_retina_images")
-            actions = torch.load(data_folder + "actions")
-            rewards = torch.load(data_folder + "rewards") * self.reward_scale
-            dones = torch.load(data_folder + "dones")
-            for i in range(states.size(0)):
-                self.memory.push(states[i], actions[i], next_states[i],
-                                 rewards[i], dones[i])
+            self._load_data(data_folder)
 
         # Populate replay buffer using noise function
         for _ in range(init_explore):
@@ -130,7 +115,7 @@ class DdpgBase:
                 action = torch.tensor(self.noise_function(),
                                       device=self.device,
                                       dtype=torch.float).clamp(-1, 1)
-                next_obs, reward = env.step(action)
+                next_obs, reward = env.step(action.cpu())
                 done = step == max_steps - 1
 
                 # Convert to tensors and save
@@ -158,7 +143,7 @@ class DdpgBase:
             for step in range(max_steps):
                 # Step using noisey action
                 action = self._get_exploration_action(state)
-                next_obs, reward = env.step(action)
+                next_obs, reward = env.step(action.cpu())
                 done = step == max_steps - 1
                 ep_reward += reward.item()
 
@@ -255,7 +240,7 @@ class DdpgBase:
             state = self.preprocessor(env.reset()).to(self.device)
             for step in range(max_steps):
                 action = self._get_exploitation_action(state)
-                next_obs, reward = env.step(action)
+                next_obs, reward = env.step(action.cpu())
                 avg_reward += reward
                 state = self.preprocessor(next_obs).to(self.device)
         return avg_reward / eval_episodes
@@ -288,6 +273,23 @@ class DdpgBase:
                                        source.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - self.tau)
                                     + param.data * self.tau)
+
+    def _load_data(self, data_folder):
+        if self.preprocessor.__class__.__name__ == 'Preprocessor':
+            states = torch.load(data_folder + "states")
+            next_states = torch.load(data_folder + "next_states")
+        elif self.preprocessor.__class__.__name__ == 'ImagePreprocessor':
+            states = torch.load(data_folder + "images")
+            next_states = torch.load(data_folder + "next_images")
+        elif self.preprocessor.__class__.__name__ == 'RetinaPreprocessor':
+            states = torch.load(data_folder + "retina_images")
+            next_states = torch.load(data_folder + "next_retina_images")
+        actions = torch.load(data_folder + "actions")
+        rewards = torch.load(data_folder + "rewards") * self.reward_scale
+        dones = torch.load(data_folder + "dones")
+        for i in range(states.size(0)):
+            self.memory.push(states[i], actions[i], next_states[i],
+                             rewards[i], dones[i])
 
     def _create_plot(self, max_episodes, max_steps, ylim):
         # Create interactive plot

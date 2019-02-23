@@ -119,26 +119,6 @@ if __name__ == '__main__':
             # retina_image = next_retina_image
             state = next_state
 
-    # Shuffle data
-    # np.random.seed(40)
-    # np.random.shuffle(images.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(next_images.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(retina_images.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(next_retina_images.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(states.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(next_states.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(actions.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(rewards.numpy())
-    # np.random.seed(40)
-    # np.random.shuffle(dones.numpy())
-
     # Save data
     torch.save(images, DATA_FOLDER + "images")
     torch.save(next_images, DATA_FOLDER + "next_images")
