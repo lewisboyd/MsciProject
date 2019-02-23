@@ -16,13 +16,13 @@ if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 0
     MAX_STEPS = 200
-    EVAL_EP = 1
+    EVAL_EP = 10
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
 
     # Training variables low state
     MAX_EPISODES_LOW = 100
-    EVAL_FREQ_LOW = 1
+    EVAL_FREQ_LOW = 2
 
     # Training variables image
     MAX_EPISODES_IMAGE = 1000
