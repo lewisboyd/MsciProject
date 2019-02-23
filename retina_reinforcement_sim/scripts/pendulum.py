@@ -16,6 +16,7 @@ if __name__ == '__main__':
     # Training variables
     INIT_EXPLORE = 0
     MAX_STEPS = 200
+    EVAL_EP = 1
     DATA_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/pendulum/data/")
 
@@ -48,31 +49,31 @@ if __name__ == '__main__':
 
     # Save paths for state_dicts
     MODEL_FOLDER_LOW = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/low_dim/")
+        os.path.realpath(__file__)) + "/pendulum/low_dim/state_dicts/")
     MODEL_FOLDER_CNN = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_pretrained/")
+        os.path.realpath(__file__)) + "/pendulum/cnn_pretrained/state_dicts/")
     MODEL_FOLDER_RETINA = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/retina/")
+        os.path.realpath(__file__)) + "/pendulum/retina/state_dicts/")
     MODEL_FOLDER_CNN_SR_FROZEN = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_sr_frozen/")
+        os.path.realpath(__file__)) + "/pendulum/cnn_sr_frozen/state_dicts/")
     MODEL_FOLDER_CNN_SR = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/state_dicts/cnn_sr/")
+        os.path.realpath(__file__)) + "/pendulum/cnn_sr/state_dicts/")
 
     # Save paths for performance data
     RESULT_FOLDER_LOW = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/low_dim/")
+        os.path.realpath(__file__)) + "/pendulum/low_dim/results/")
     RESULT_FOLDER_CNN = (os.path.dirname(os.path.realpath(__file__))
-                         + "/pendulum/results/cnn_pretrained/")
+                         + "/pendulum/cnn_pretrained/results/")
     RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
-                            + "/pendulum/results/retina/")
+                            + "/pendulum/retina/results/")
     RESULT_FOLDER_CNN_SR_FROZEN = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/cnn_sr_frozen/")
+        os.path.realpath(__file__)) + "/pendulum/cnn_sr_frozen/results/")
     RESULT_FOLDER_CNN_SR = (os.path.dirname(
-        os.path.realpath(__file__)) + "/pendulum/results/cnn_sr/")
+        os.path.realpath(__file__)) + "/pendulum/cnn_sr/results/")
 
     # Path to state_dict for state represenation net
     SR_STATE_DICT = (os.path.dirname(os.path.realpath(__file__))
-                     + "/pendulum/state_dicts/sr/net_20")
+                     + "/pendulum/sr/state_dicts/net_20")
 
     # Create low state pendulum environment and its preprocessor
     environment = PendulumLow()
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
                 MODEL_FOLDER_LOW, RESULT_FOLDER_LOW,
                 data_folder=DATA_FOLDER, plot_ylim=[-2000, 0],
-                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
+                eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
     # Create image pendulum environment and its preprocessor
     environment = PendulumPixel()
@@ -115,7 +116,7 @@ if __name__ == '__main__':
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
                 MODEL_FOLDER_CNN_SR_FROZEN, RESULT_FOLDER_CNN_SR_FROZEN,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
-                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
+                eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
     # DDPG agent using state representation net with parameters trainable
     sr_net.load_state_dict(torch.load(SR_STATE_DICT))
@@ -134,7 +135,7 @@ if __name__ == '__main__':
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
                 MODEL_FOLDER_CNN_SR, RESULT_FOLDER_CNN_SR,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
-                eval_freq=EVAL_FREQ_LOW, eval_ep=1)
+                eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
     # DDPG agent using pretrained convolutional layers
     actor = ActorCnn(NUM_IMAGES, ACTION_DIM).cuda()
@@ -159,4 +160,4 @@ if __name__ == '__main__':
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_IMAGE, MAX_STEPS,
                 MODEL_FOLDER_CNN, RESULT_FOLDER_CNN,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
-                eval_freq=EVAL_FREQ_IMAGE, eval_ep=1)
+                eval_freq=EVAL_FREQ_IMAGE, eval_ep=EVAL_EP)
