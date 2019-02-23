@@ -11,6 +11,7 @@ import retina_cuda
 class Preprocessor:
 
     def __call__(self, obs):
+        obs[2] = obs[2] / 8
         return torch.tensor(obs, dtype=torch.float)
 
 

@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     # Training variables low state
     MAX_EPISODES_LOW = 100
-    EVAL_FREQ_LOW = 2
+    EVAL_FREQ_LOW = 5
 
     # Training variables image
     MAX_EPISODES_IMAGE = 1000
@@ -82,7 +82,6 @@ if __name__ == '__main__':
     # DDPG agent using low state dimension
     actor = ActorMlp(STATE_DIM_LOW, ACTION_DIM).cuda()
     actor_optim = torch.optim.Adam(actor.parameters(), 0.0001)
-
     critic = CriticMlp(STATE_DIM_LOW, ACTION_DIM).cuda()
     critic_optim = torch.optim.Adam(critic.parameters(), 0.001,
                                     weight_decay=0.01)
