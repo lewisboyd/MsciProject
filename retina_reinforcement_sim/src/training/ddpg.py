@@ -85,9 +85,9 @@ class Ddpg:
             eval_ep (int): How many episodes to run for evaluation.
         """
         # Create folders for saving data
-        if not os.path.isdir(model_folder):
+        if model_folder is not None and not os.path.isdir(model_folder):
             os.makedirs(model_folder)
-        if not os.path.isdir(result_folder):
+        if result_folder is not None and not os.path.isdir(result_folder):
             os.makedirs(result_folder)
 
         # Create interactive plot
@@ -131,57 +131,63 @@ class Ddpg:
         self._update_plot(reward_plot, 0, eval_reward)
         print "Initial Performance: %0.2f" % eval_reward
 
-        # Train models
-        for ep in range(1, max_episodes + 1):
-            # Reset noise function and environment
-            self.noise_function.reset()
-            state = self.preprocessor(env.reset()).to(self.device)
+        try:
+            # Train models
+            for ep in range(1, max_episodes + 1):
+                # Reset noise function and environment
+                self.noise_function.reset()
+                state = self.preprocessor(env.reset()).to(self.device)
 
-            ep_reward = 0.
-            for step in range(max_steps):
-                # Step using noisey action
-                action = self._get_exploration_action(state)
-                next_obs, reward = env.step(action.cpu())
-                done = step == max_steps - 1
-                ep_reward += reward.item()
+                ep_reward = 0.
+                for step in range(max_steps):
+                    # Step using noisey action
+                    action = self._get_exploration_action(state)
+                    next_obs, reward = env.step(action.cpu())
+                    done = step == max_steps - 1
+                    ep_reward += reward.item()
 
-                # Convert to tensors and save
-                next_state = self.preprocessor(next_obs).to(self.device)
-                reward = self._reward_to_tensor(reward)
-                done = self._done_to_tensor(done)
-                self.memory.push(state, action, next_state, reward, done)
+                    # Convert to tensors and save
+                    next_state = self.preprocessor(next_obs).to(self.device)
+                    reward = self._reward_to_tensor(reward)
+                    done = self._done_to_tensor(done)
+                    self.memory.push(state, action, next_state, reward, done)
 
-                # Optimise agent
-                self._optimise()
+                    # Optimise agent
+                    self._optimise()
 
-                # Update current state
-                state = next_state
+                    # Update current state
+                    state = next_state
 
-            print "Episode: %4d/%4d  Reward: %0.2f" % (
-                ep, max_episodes, ep_reward)
+                print "Episode: %4d/%4d  Reward: %0.2f" % (
+                    ep, max_episodes, ep_reward)
 
-            # Evaluate performance and save agent every 100 episodes
-            if ep % eval_freq == 0 or ep == max_episodes:
-                eval_reward = self._evaluate(env, max_steps, eval_ep)
-                self._update_plot(reward_plot, ep * max_steps, eval_reward)
+                # Evaluate performance and save agent every 100 episodes
+                if ep % eval_freq == 0 and not ep == max_episodes:
+                    eval_reward = self._evaluate(env, max_steps, eval_ep)
+                    self._update_plot(reward_plot, ep * max_steps, eval_reward)
+                    if model_folder is not None and not ep == max_episodes:
+                        self._save(model_folder, str(ep))
+                    print "Evaluation Reward: %0.2f" % eval_reward
+        finally:
+            if result_folder is not None:
+                # Save figure and data
+                plt.savefig(result_folder + "training_performance.png")
+                reward_plot.get_xdata().tofile(result_folder
+                                               + "eval_timesteps.txt")
+                reward_plot.get_ydata().tofile(result_folder
+                                               + "eval_rewards.txt")
+
+            if model_folder is not None:
                 self._save(model_folder, str(ep))
-                print "Evaluation Reward: %0.2f" % eval_reward
 
-        # Save figure and data
-        plt.savefig(result_folder + "training_performance.png")
-        reward_plot.get_xdata().tofile(result_folder
-                                       + "eval_timesteps.txt")
-        reward_plot.get_ydata().tofile(result_folder
-                                       + "eval_rewards.txt")
+            # Close figure and environment
+            plt.clf()
+            env.close()
 
-        # Close figure and environment
-        plt.clf()
-        env.close()
-
-        end = time.time()
-        mins = (end - start) / 60
-        print "Training finished after %d hours %d minutes" % (
-            mins / 60, mins % 60)
+            end = time.time()
+            mins = (end - start) / 60
+            print "Training finished after %d hours %d minutes" % (
+                mins / 60, mins % 60)
 
     def _optimise(self):
         # Sample memory

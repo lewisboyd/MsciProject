@@ -110,9 +110,9 @@ class ActorCnn(nn.Module):
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
         self.conv3 = nn.Conv2d(64, 64, 3)
-        self.fc1 = nn.Linear(1024, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, num_actions)
+        self.fc1 = nn.Linear(1024, 400)
+        self.fc2 = nn.Linear(400, 300)
+        self.fc3 = nn.Linear(300, num_actions)
 
         # Initialise weights
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
@@ -168,9 +168,9 @@ class CriticCnn(nn.Module):
         self.conv1 = nn.Conv2d(num_images, 32, 8, 4)
         self.conv2 = nn.Conv2d(32, 64, 4, 2)
         self.conv3 = nn.Conv2d(64, 64, 3)
-        self.fc1 = nn.Linear(1024, 512)
-        self.fc2 = nn.Linear(512 + num_actions, 256)
-        self.fc3 = nn.Linear(256, 1)
+        self.fc1 = nn.Linear(1024, 400)
+        self.fc2 = nn.Linear(400 + num_actions, 300)
+        self.fc3 = nn.Linear(300, 1)
 
         # Initialise weights
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.conv1.weight)
