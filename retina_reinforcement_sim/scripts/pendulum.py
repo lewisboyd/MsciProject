@@ -48,36 +48,36 @@ if __name__ == '__main__':
     EXPLORATION_LEN_IMAGE = 100000
 
     # Save paths for state_dicts
-    MODEL_FOLDER_MLP = (os.path.dirname(os.path.realpath(__file__))
-                        + "/pendulum/mlp/state_dicts/")
-    MODEL_FOLDER_CNN_PRE2 = (os.path.dirname(os.path.realpath(__file__))
-                             + "/pendulum/cnn_pre2_frozen/state_dicts/")
-    MODEL_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
-                           + "/pendulum/retina/state_dicts/")
-    MODEL_FOLDER_CNN_SR1_FROZEN = (os.path.dirname(os.path.realpath(__file__))
-                                   + "/pendulum/cnn_sr1_frozen/state_dicts/")
-    MODEL_FOLDER_CNN_SR1 = (os.path.dirname(os.path.realpath(__file__))
-                            + "/pendulum/cnn_sr1_low_rs/state_dicts/")
-    MODEL_FOLDER_CNN_SR2_FROZEN = (os.path.dirname(os.path.realpath(__file__))
-                                   + "/pendulum/cnn_sr2_frozen/state_dicts/")
-    MODEL_FOLDER_CNN_SR2 = (os.path.dirname(os.path.realpath(__file__))
-                            + "/pendulum/cnn_sr2_low_rs/state_dicts/")
+    MODEL_MLP = (os.path.dirname(os.path.realpath(__file__))
+                 + "/pendulum/mlp_normRs/state_dicts/")
+    MODEL_CNN_PRE2 = (os.path.dirname(os.path.realpath(__file__))
+                      + "/pendulum/cnn_pre2Frozen_lowRs/state_dicts/")
+    MODEL_RETINA = (os.path.dirname(os.path.realpath(__file__))
+                    + "/pendulum/retina/state_dicts/")
+    MODEL_CNN_SR1_FROZEN = (os.path.dirname(os.path.realpath(__file__))
+                            + "/pendulum/cnn_sr1Frozen_lowRs/state_dicts/")
+    MODEL_CNN_SR1 = (os.path.dirname(os.path.realpath(__file__))
+                     + "/pendulum/cnn_sr1_lowRs/state_dicts/")
+    MODEL_CNN_SR2_FROZEN = (os.path.dirname(os.path.realpath(__file__))
+                            + "/pendulum/cnn_sr2Frozen_lowRs/state_dicts/")
+    MODEL_CNN_SR2 = (os.path.dirname(os.path.realpath(__file__))
+                     + "/pendulum/cnn_sr2_lowRs/state_dicts/")
 
     # Save paths for performance data
-    RESULT_FOLDER_MLP = (os.path.dirname(os.path.realpath(__file__))
-                         + "/pendulum/mlp/results/")
-    RESULTL_FOLDER_CNN_PRE2 = (os.path.dirname(os.path.realpath(__file__))
-                               + "/pendulum/cnn_pre2_frozen/results/")
-    RESULT_FOLDER_RETINA = (os.path.dirname(os.path.realpath(__file__))
-                            + "/pendulum/retina/results/")
-    RESULT_FOLDER_CNN_SR1_FROZEN = (os.path.dirname(os.path.realpath(__file__))
-                                    + "/pendulum/cnn_sr1_frozen/results/")
-    RESULT_FOLDER_CNN_SR1 = (os.path.dirname(os.path.realpath(__file__))
-                             + "/pendulum/cnn_sr1_low_rs/results/")
-    RESULT_FOLDER_CNN_SR2_FROZEN = (os.path.dirname(os.path.realpath(__file__))
-                                    + "/pendulum/cnn_sr2_frozen/results/")
-    RESULT_FOLDER_CNN_SR2 = (os.path.dirname(os.path.realpath(__file__))
-                             + "/pendulum/cnn_sr2_low_rs/results/")
+    RESULT_MLP = (os.path.dirname(os.path.realpath(__file__))
+                  + "/pendulum/mlp_normRs/results/")
+    RESULT_CNN_PRE2 = (os.path.dirname(os.path.realpath(__file__))
+                       + "/pendulum/cnn_pre2Frozen_lowRs/results/")
+    RESULT_RETINA = (os.path.dirname(os.path.realpath(__file__))
+                     + "/pendulum/retina/results/")
+    RESULT_CNN_SR1_FROZEN = (os.path.dirname(os.path.realpath(__file__))
+                             + "/pendulum/cnn_sr1Frozen_lowRs/results/")
+    RESULT_CNN_SR1 = (os.path.dirname(os.path.realpath(__file__))
+                      + "/pendulum/cnn_sr1_lowRs/results/")
+    RESULT_CNN_SR2_FROZEN = (os.path.dirname(os.path.realpath(__file__))
+                             + "/pendulum/cnn_sr2Frozen_lowRs/results/")
+    RESULT_CNN_SR2 = (os.path.dirname(os.path.realpath(__file__))
+                      + "/pendulum/cnn_sr2_lowRs/results/")
 
     # Path to state_dict for state represenation net
     SR1_STATE_DICT = (os.path.dirname(os.path.realpath(__file__))
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN_IMAGE, 1, actor,
                  actor_optim, critic, critic_optim, preprocessor)
     agent.train(environment, 500, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_MLP, RESULT_FOLDER_MLP,
+                MODEL_MLP, RESULT_MLP,
                 data_folder=None, plot_ylim=[-2000, 0],
                 eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     #              FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
     #              actor_optim, critic, critic_optim, preprocessor)
     # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-    #             MODEL_FOLDER_CNN_SR1_FROZEN, RESULT_FOLDER_CNN_SR1_FROZEN,
+    #             MODEL_CNN_SR1_FROZEN, RESULT_CNN_SR1_FROZEN,
     #             data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
     #             eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
                  actor_optim, critic, critic_optim, preprocessor)
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_CNN_SR1, RESULT_FOLDER_CNN_SR1,
+                MODEL_CNN_SR1, RESULT_CNN_SR1,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
                 eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     #              FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
     #              actor_optim, critic, critic_optim, preprocessor)
     # agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-    #             MODEL_FOLDER_CNN_SR2_FROZEN, RESULT_FOLDER_CNN_SR2_FROZEN,
+    #             MODEL_CNN_SR2_FROZEN, RESULT_CNN_SR2_FROZEN,
     #             data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
     #             eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
                  actor_optim, critic, critic_optim, preprocessor)
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_LOW, MAX_STEPS,
-                MODEL_FOLDER_CNN_SR2, RESULT_FOLDER_CNN_SR2,
+                MODEL_CNN_SR2, RESULT_CNN_SR2,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
                 eval_freq=EVAL_FREQ_LOW, eval_ep=EVAL_EP)
 
@@ -206,6 +206,6 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN_IMAGE, REWARD_SCALE, actor,
                  actor_optim, critic, critic_optim, preprocessor)
     agent.train(environment, INIT_EXPLORE, MAX_EPISODES_IMAGE, MAX_STEPS,
-                MODEL_FOLDER_CNN_PRE2, RESULTL_FOLDER_CNN_PRE2,
+                MODEL_CNN_PRE2, RESULT_CNN_PRE2,
                 data_folder=DATA_FOLDER, plot_ylim=[-5000, 0],
                 eval_freq=EVAL_FREQ_IMAGE, eval_ep=EVAL_EP)
