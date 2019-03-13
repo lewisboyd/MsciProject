@@ -2,20 +2,23 @@ import rospy
 from threading import Event
 from Queue import Queue
 from sensor_msgs.msg import Image
-
+from cv_bridge import CvBridge
+import cv2
 
 class CameraController:
-    """Class to get most recent image from a camera's topic."""
+    """Class to get the most recent image from a camera's topic."""
 
-    def __init__(self, image_topic="/cameras/left_hand_camera/image"):
+    def __init__(self, image_topic, img_size):
         """Start a subcriber to populate the queue with an image when called.
 
         Args:
             image_topic (str): topic for the camera's image messages
+            img_size (tuple): size (height, width) of image to return
 
         """
         self.image_queue = Queue(1)
         self.ready_for_data_event = Event()
+        self.img_size = img_size
         rospy.Subscriber(image_topic, Image, self._callback, queue_size=1,
                          buff_size=20000000)
 
@@ -24,7 +27,10 @@ class CameraController:
             self.image_queue.put(image_data)
             self.ready_for_data_event.clear()
 
-    def get_image_data(self):
-        """Return the next image message."""
+    def get_image(self):
+        """Get and preprocess the most recent image."""
         self.ready_for_data_event.set()
-        return self.image_queue.get()
+        image_data = self.image_queue.get()
+        image = bridge.imgmsg_to_cv2(image_data, "rgb8")
+        image = cv2.resize(image, self.img_size, interpolation=cv2.INTER_AREA)
+        return image
