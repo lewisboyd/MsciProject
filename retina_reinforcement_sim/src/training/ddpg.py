@@ -65,17 +65,17 @@ class Ddpg:
         self.critic_target = copy.deepcopy(critic).to(self.device)
         self.critic_optim = critic_optim
 
-    def train(self, env, init_explore, max_episodes, max_steps,
+    def train(self, env, init_explore, max_steps, max_ep_steps,
               model_folder, result_folder, data_folder=None,
-              plot_ylim=[-200, 0], eval_freq=100, eval_ep=10):
+              plot_ylim=[-200, 0], eval_freq=1000, eval_ep=10):
         """Train the agent.
 
         Args:
             env (object): Environment to train agent in.
-            init_explore (int): Number of episodes to prepopulate replay
+            init_explore (int): Number of timesteps to prepopulate replay
                                 buffer.
-            max_episodes (int): Maximum number of training episodes.
-            max_steps (int): Maximum number of steps in one episode.
+            max_steps (int): Maximum number of training steps.
+            max_ep_steps (int): Maximum number of steps in one episode.
             model_folder (path): Folder to save models in during training.
             result_folder (path): Folder to save evaluation data.
             data_folder (path): If specified load to populate replay buffer.
@@ -91,7 +91,7 @@ class Ddpg:
             os.makedirs(result_folder)
 
         # Create interactive plot
-        reward_plot = self._create_plot(max_episodes, max_steps, plot_ylim)
+        reward_plot = self._create_plot(max_steps, plot_ylim)
 
         start = time.time()
 
@@ -103,72 +103,106 @@ class Ddpg:
         # Populate replay buffer using noise function
         if init_explore > 0:
             print "Prepopulating experience replay"
-            for _ in range(init_explore):
-                # Reset noise function and environment
-                self.noise_function.reset()
-                state = self.preprocessor(env.reset()).to(self.device)
+            timestep_t = 0
+            timestep_ep = 0
+            done = False
+            self.noise_function.reset()
+            state = self.preprocessor(env.reset()).to(self.device)
+            while timestep_t < init_explore:
+                timestep_t = timestep_t + 1
+                timestep_ep = timestep_ep + 1
 
-                for step in range(max_steps):
-                    # Step using noise value
-                    action = torch.tensor(self.noise_function(),
-                                          device=self.device,
-                                          dtype=torch.float).clamp(-1, 1)
-                    next_obs, reward = env.step(action.cpu())
-                    done = step == max_steps - 1
+                # When episode finished reset environment and noise function
+                if done:
+                    self.noise_function.reset()
+                    state = self.preprocessor(env.reset()).to(self.device)
+                    timestep_ep = 0
 
-                    # Convert to tensors and save
-                    next_state = self.preprocessor(next_obs).to(self.device)
-                    reward = self._reward_to_tensor(reward)
-                    done = self._done_to_tensor(done)
-                    self.memory.push(state, action, next_state, reward, done)
+                # Step through environment
+                action = torch.tensor(self.noise_function(),
+                                      device=self.device,
+                                      dtype=torch.float).clamp(-1, 1)
+                next_obs, reward, done = env.step(action.cpu())
+                done = done or (timestep_ep == max_ep_steps)
 
-                    # Update current state
-                    state = next_state
+                # Convert to tensors and save
+                next_state = self.preprocessor(next_obs).to(self.device)
+                reward = self._reward_to_tensor(reward)
+                self.memory.push(state, action, next_state,
+                                 reward, self._done_to_tensor(done))
+
+                # Update current state
+                state = next_state
 
         # Evaluate initial performance
         print "Evaluating initial performance"
-        eval_reward = self._evaluate(env, max_steps, eval_ep)
+        eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
         self._update_plot(reward_plot, 0, eval_reward)
         print "Initial Performance: %0.2f" % eval_reward
 
+        # Run training loop
         try:
-            # Train models
-            for ep in range(1, max_episodes + 1):
-                # Reset noise function and environment
-                self.noise_function.reset()
-                state = self.preprocessor(env.reset()).to(self.device)
+            ep = 1
+            timestep_t = 0
+            timestep_ep = 0
+            timestep_eval = eval_freq
+            ep_reward = 0.
+            done = False
+            self.noise_function.reset()
+            state = self.preprocessor(env.reset()).to(self.device)
+            timestep_ep = 0
+            ep_reward = 0.
+            while timestep_t < max_steps:
+                if done:
+                    # Report episode performance
+                    print "Episode: %4d  Reward: %0.2f" % (
+                        ep, ep_reward)
+                    ep = ep + 1
 
-                ep_reward = 0.
-                for step in range(max_steps):
-                    # Step using noisey action
-                    action = self._get_exploration_action(state)
-                    next_obs, reward = env.step(action.cpu())
-                    done = step == max_steps - 1
-                    ep_reward += reward.item()
+                    # Reset the environment
+                    self.noise_function.reset()
+                    state = self.preprocessor(env.reset()).to(self.device)
+                    timestep_ep = 0
+                    ep_reward = 0.
 
-                    # Convert to tensors and save
-                    next_state = self.preprocessor(next_obs).to(self.device)
-                    reward = self._reward_to_tensor(reward)
-                    done = self._done_to_tensor(done)
-                    self.memory.push(state, action, next_state, reward, done)
+                    # Run evaluation if enough timesteps have passed
+                    if timestep_t >= timestep_eval:
+                        eval_reward = self._evaluate(
+                            env, max_ep_steps, eval_ep)
+                        self._update_plot(reward_plot, ep
+                                          * max_steps, eval_reward)
+                        if (model_folder is not None
+                                and not timestep_t == max_steps):
+                            self._save(model_folder, str(timestep_eval))
+                        print "Evaluation Reward: %0.2f" % eval_reward
+                        timestep_eval = timestep_eval + eval_freq
 
-                    # Optimise agent
-                    self._optimise()
+                # Step through environment
+                timestep_t = timestep_t + 1
+                timestep_ep = timestep_ep + 1
+                action = self._get_exploration_action(state)
+                next_obs, reward, done = env.step(action.cpu())
+                done = done or (timestep_ep == max_ep_steps)
+                ep_reward += reward
 
-                    # Update current state
-                    state = next_state
+                # Convert to tensors and save
+                next_state = self.preprocessor(next_obs).to(self.device)
+                reward = self._reward_to_tensor(reward)
+                self.memory.push(state, action, next_state,
+                                 reward, self._done_to_tensor(done))
 
-                print "Episode: %4d/%4d  Reward: %0.2f" % (
-                    ep, max_episodes, ep_reward)
+                # Optimise agent
+                self._optimise()
 
-                # Evaluate performance and save agent every 100 episodes
-                if ep % eval_freq == 0 and not ep == max_episodes:
-                    eval_reward = self._evaluate(env, max_steps, eval_ep)
-                    self._update_plot(reward_plot, ep * max_steps, eval_reward)
-                    if model_folder is not None and not ep == max_episodes:
-                        self._save(model_folder, str(ep))
-                    print "Evaluation Reward: %0.2f" % eval_reward
+                # Update current state
+                state = next_state
         finally:
+            # Evaluate final performance
+            print "Evaluating final performance"
+            eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
+            self._update_plot(reward_plot, str(max_steps), eval_reward)
+            print "Final Performance: %0.2f" % eval_reward
+
             if result_folder is not None:
                 # Save figure and data
                 plt.savefig(result_folder + "training_performance.png")
@@ -177,13 +211,15 @@ class Ddpg:
                 reward_plot.get_ydata().tofile(result_folder
                                                + "eval_rewards.txt")
 
+            # Save the model
             if model_folder is not None:
-                self._save(model_folder, str(ep))
+                self._save(model_folder, str(max_steps))
 
             # Close figure and environment
             plt.clf()
             env.close()
 
+            # Report training time
             end = time.time()
             mins = (end - start) / 60
             print "Training finished after %d hours %d minutes" % (
@@ -237,22 +273,27 @@ class Ddpg:
             return torch.tensor([0], dtype=torch.float).to(self.device)
         return torch.tensor([1], dtype=torch.float).to(self.device)
 
-    def _evaluate(self, env, max_steps, eval_episodes=10):
+    def _evaluate(self, env, max_steps, eval_episodes):
         # Average multiple episode rewards
         avg_reward = 0.
         for _ in range(eval_episodes):
             state = self.preprocessor(env.reset()).to(self.device)
-            for step in range(max_steps):
+            done = False
+            timestep = 0
+            while not done:
+                timestep = timestep + 1
                 action = self._get_exploitation_action(state)
-                next_obs, reward = env.step(action.cpu())
+                next_obs, reward, done = env.step(action.cpu())
                 avg_reward += reward
+                done = done or (timestep == max_steps)
                 state = self.preprocessor(next_obs).to(self.device)
         return avg_reward / eval_episodes
 
     def _get_exploitation_action(self, state):
         with torch.no_grad():
             self.actor.eval()
-            action = self.actor(state.unsqueeze(0)).view(1)
+            # action = self.actor(state.unsqueeze(0)).view(1)
+            action = self.actor(state.unsqueeze(0)).squeeze(0)
             self.actor.train()
             return action
 
@@ -260,11 +301,12 @@ class Ddpg:
         with torch.no_grad():
             noise_values = torch.tensor(
                 self.noise_function(), device=self.device)
-            # if self.noise > self.final_noise:
-            #     self.noise -= self.noise_decay
-            #     if self.noise < self.final_noise:
-            #         self.noise = self.final_noise
-            action = self.actor(state.unsqueeze(0)).view(1)
+            if self.noise > self.final_noise:
+                self.noise -= self.noise_decay
+                if self.noise < self.final_noise:
+                    self.noise = self.final_noise
+            # action = self.actor(state.unsqueeze(0)).view(1)
+            action = self.actor(state.unsqueeze(0)).squeeze(0)
             noisy_action = action + self.noise * noise_values.float()
             return noisy_action.clamp(-1, 1)
 
@@ -279,7 +321,8 @@ class Ddpg:
                                     + param.data * self.tau)
 
     def _load_data(self, data_folder):
-        if self.preprocessor.__class__.__name__ == 'Preprocessor':
+        if (self.preprocessor.__class__.__name__ == 'PendulumPreprocessor'
+                or self.preprocessor.__class__.__name__ == 'BaxterPreprocessor'):
             states = torch.load(data_folder + "states")
             next_states = torch.load(data_folder + "next_states")
         elif self.preprocessor.__class__.__name__ == 'ImagePreprocessor':
@@ -295,7 +338,7 @@ class Ddpg:
             self.memory.push(states[i], actions[i], next_states[i],
                              rewards[i], dones[i])
 
-    def _create_plot(self, max_episodes, max_steps, ylim):
+    def _create_plot(self, max_steps, ylim):
         # Create interactive plot
         plt.ion()
         plt.show(block=False)
@@ -305,8 +348,8 @@ class Ddpg:
         ax.set_ylabel('Episode Reward')
 
         # Set limits
-        ax.set_xlim(0, max_episodes * max_steps)
-        ax.set_ylim(*ylim)
+        ax.set_xlim(0, max_steps)
+        ax.set_ylim(ylim)
 
         # Create subplot without any data
         reward_plot, = ax.plot(0, 0, 'b')

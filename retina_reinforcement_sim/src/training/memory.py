@@ -13,7 +13,7 @@ class ReplayMemory(object):
         """Create empty list bounded by the capacity.
 
         Args:
-            capacity (int) : max number of experiences to store
+            capacity (int): Maximum number of experiences to store
 
         """
         self.capacity = capacity
@@ -24,11 +24,11 @@ class ReplayMemory(object):
         """Save an experience overwritting an old experience if memory is full.
 
         Args:
-            state (object) : The state the action executed in
-            action (list of float) : The action values
-            next_state (object) : Next state after action executed
-            reward (float) : Reward given for executing the action
-            done (boolean) : If the episode is now finished
+            state (tensor): The state the action executed in
+            action (tensor): The action values
+            next_state (tensor): Next state after action executed
+            reward (tensor): Reward given for executing the action
+            done (tensor): 0 for episode finished, 1 for still in progress
 
         """
         if len(self.memory) < self.capacity:
@@ -49,10 +49,10 @@ class ReplayMemory(object):
         """Return a list of randomly choosen experiences.
 
         Args:
-            batch_size (int) : Number of experiences to sample
+            batch_size (int): Number of experiences to sample
 
         Returns:
-            list of Experiences : randomly choosen list of experiences
+            list of Experiences: randomly choosen list of experiences
 
         """
         return random.sample(self.memory, batch_size)

@@ -8,10 +8,23 @@ import cortex_cuda
 import retina_cuda
 
 
-class Preprocessor:
+class PendulumPreprocessor:
+    """Preprocessor for low state Pendulum environment."""
 
     def __call__(self, obs):
+        """Minmax observation and return in a tensor."""
         obs[2] = obs[2] / 8
+        return torch.tensor(obs, dtype=torch.float)
+
+
+class BaxterPreprocessor:
+    """Preprocessor for low state Baxter environment."""
+
+    def __call__(self, obs):
+        """Return observation in a tensor."""
+        # The baxter environment may return None when episode finishes
+        if None in obs:
+            return torch.tensor([0, 0], dtype=torch.float)
         return torch.tensor(obs, dtype=torch.float)
 
 

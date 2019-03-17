@@ -17,6 +17,9 @@ class NormalActionNoise:
         self.sigma = sigma
         self.actions = actions
 
+    def reset(self):
+        pass
+
     def __call__(self):
         """Return normally distributed noise."""
         return np.random.normal(self.mu, self.sigma, self.actions)
