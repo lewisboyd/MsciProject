@@ -1,3 +1,4 @@
 *.pyc
 *.png
 retina_reinforcement_sim/scripts/pendulum/*
+retina_reinforcement_sim/scripts/baxter_center/*

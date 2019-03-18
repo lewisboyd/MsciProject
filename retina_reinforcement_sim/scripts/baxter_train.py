@@ -30,7 +30,7 @@ if __name__ == '__main__':
     RESULT = (os.path.dirname(os.path.realpath(__file__))
               + "/baxter_center/mlp_normRs/results/")
     PLOT_YLIM = [-30, 0]
-    EVAL_FREQ = 2000
+    EVAL_FREQ = 40
     EVAL_EP = 10
 
     # Agent variables

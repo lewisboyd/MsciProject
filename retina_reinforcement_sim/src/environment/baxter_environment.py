@@ -6,6 +6,7 @@ import cv2
 import rospy
 import rospkg
 import baxter_interface
+import baxter_dataflow
 from gazebo_msgs.srv import (
     SpawnModel,
     DeleteModel,
@@ -72,7 +73,7 @@ class BaxterEnvironment:
 
         # Limit on endpoint movements
         self._x_lim = 0.2
-        self._y_lim = 0.2
+        self._y_lim = 0.3
         self._z_lim = 0.4
 
     def reset(self):
@@ -163,12 +164,12 @@ class BaxterEnvironment:
 
     def _calc_dist(self):
         # Define lower and upper colour bounds
-        ORANGE_MIN = np.array([5, 50, 50], np.uint8)
-        ORANGE_MAX = np.array([15, 255, 255], np.uint8)
+        BLUE_MIN = np.array([100, 150, 0], np.uint8)
+        BLUE_MAX = np.array([140, 255, 255], np.uint8)
 
         # Threshold the image in the HSV colour space
         hsv_image = cv2.cvtColor(self.image, cv2.COLOR_RGB2HSV)
-        mask = cv2.inRange(hsv_image, ORANGE_MIN, ORANGE_MAX)
+        mask = cv2.inRange(hsv_image, BLUE_MIN, BLUE_MAX)
 
         # If no object in image return none
         moments = cv2.moments(mask)
@@ -194,13 +195,16 @@ class BaxterEnvironment:
         pose = Pose()
         pose.position.x = x
         pose.position.y = y
-        pose.position.z = self._left_arm.endpoint_pose()['position'].z
-        pose.orientation = self._left_arm.endpoint_pose()['orientation']
+        pose.position.z = 0.3
+        pose.orientation.x = 0.0
+        pose.orientation.y = 1.0
+        pose.orientation.z = 0.0
+        pose.orientation.w = 0.0
 
         # Return result from inverse kinematics or none if move invalid
         i = 0
         joint_angles = None
-        while joint_angles is None and i < 20:
+        while joint_angles is None and i < 5:
             joint_angles = self._ik_request(pose)
             i = i + 1
         return joint_angles
@@ -240,9 +244,22 @@ class BaxterEnvironment:
         return limb_joints
 
     def _move_arm(self, joint_angles):
-        # Move arm then sleep
-        self._left_arm.move_to_joint_positions(joint_angles)
-        rospy.sleep(1)
+        # Gets differences between desired and actual joint angles
+        def genf(joint, angle):
+            def joint_diff():
+                return abs(angle - self._left_arm.joint_angle(joint))
+            return joint_diff
+        diffs = [genf(j, a) for j, a in joint_angles.items()]
+
+        # Move arm until in correct position
+        self._left_arm.set_joint_positions(joint_angles, raw=True)
+        baxter_dataflow.wait_for(
+            lambda: (all(diff() < 0.008726646 for diff in diffs)),
+            timeout=2.0,
+            rate=100,
+            raise_on_error=False,
+            body=lambda: self._left_arm.set_joint_positions(joint_angles)
+        )
 
     def _move_block(self):
         # Generate random x and y locations within reachable area
@@ -262,7 +279,6 @@ class BaxterEnvironment:
                 '/gazebo/set_model_state', SetModelState
             )
             set_model_state(model_state)
-            rospy.sleep(1)
             self._obj_x_pos = block_pos.position.x
             self._obj_y_pos = block_pos.position.y
             self._obj_z_pos = block_pos.position.z

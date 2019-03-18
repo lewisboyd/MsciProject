@@ -32,6 +32,7 @@ class CameraController:
 
     def get_image(self):
         """Get and preprocess the most recent image."""
+        rospy.sleep(0.2)
         self.ready_for_data_event.set()
         img_data = self.img_queue.get()
         img = self.bridge.imgmsg_to_cv2(img_data, "rgb8")

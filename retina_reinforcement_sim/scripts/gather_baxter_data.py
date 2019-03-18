@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import time
 
 import torch
 import rospy
@@ -10,11 +11,13 @@ from environment import BaxterEnvironment
 
 
 if __name__ == '__main__':
+    start = time.time()
+
     # Variables
     SIZE = 10000
     STATE_DIM = 2
     ACTION_DIM = 2
-    MAX_EP_STEPS = 15
+    MAX_EP_STEPS = SIZE / 100
 
     # Create folder to save data
     DATA_FOLDER = (os.path.dirname(
@@ -83,3 +86,8 @@ if __name__ == '__main__':
 
     # Close environment
     env.close()
+
+    end = time.time()
+    mins = (end - start) / 60
+    print "Gathered %d experiences in %d hours %d minutes" % (
+        SIZE, mins / 60, mins % 60)

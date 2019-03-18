@@ -67,7 +67,7 @@ class Ddpg:
 
     def train(self, env, init_explore, max_steps, max_ep_steps,
               updates_per_step, model_folder, result_folder, data_folder=None,
-              plot_ylim=[-200, 0], eval_freq=1000, eval_ep=10):
+              plot_ylim=[-200, 0], eval_freq=40, eval_ep=10):
         """Train the agent.
 
         Args:
@@ -147,19 +147,15 @@ class Ddpg:
             ep = 1
             timestep_t = 0
             timestep_ep = 0
-            timestep_eval = eval_freq
             ep_reward = 0.
             done = False
             self.noise_function.reset()
             state = self.preprocessor(env.reset()).to(self.device)
-            timestep_ep = 0
-            ep_reward = 0.
             while timestep_t < max_steps:
                 if done:
                     # Report episode performance
-                    print "Episode: %4d  Reward: %0.2f" % (
-                        ep, ep_reward)
-                    ep = ep + 1
+                    print "Timestep: %6d/%6d Episode: %4d  Reward: %0.2f" % (
+                        timestep_t, max_steps, ep, ep_reward)
 
                     # Reset the environment
                     self.noise_function.reset()
@@ -168,16 +164,17 @@ class Ddpg:
                     ep_reward = 0.
 
                     # Run evaluation if enough timesteps have passed
-                    if timestep_t >= timestep_eval:
+                    if ep % eval_freq == 0:
                         eval_reward = self._evaluate(
                             env, max_ep_steps, eval_ep)
-                        self._update_plot(reward_plot, ep
-                                          * max_steps, eval_reward)
+                        self._update_plot(
+                            reward_plot, timestep_t, eval_reward)
                         if (model_folder is not None
                                 and not timestep_t == max_steps):
-                            self._save(model_folder, str(timestep_eval))
+                            self._save(model_folder, str(ep))
                         print "Evaluation Reward: %0.2f" % eval_reward
-                        timestep_eval = timestep_eval + eval_freq
+
+                    ep = ep + 1
 
                 # Step through environment
                 timestep_t = timestep_t + 1

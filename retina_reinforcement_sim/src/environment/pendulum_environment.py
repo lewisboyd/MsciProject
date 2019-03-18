@@ -20,7 +20,7 @@ class PendulumLow:
         action = action * 2
         new_state, reward, _, _ = self.env.step(action)
         self.env.render()
-        return new_state, reward
+        return new_state, reward, False
 
     def close(self):
         """Close the environment."""
@@ -55,7 +55,7 @@ class PendulumPixel:
         img3 = self.env.render(mode='rgb_array')
         new_obs = np.stack((img1, img2, img3))
         reward = reward1 + reward2 + reward3
-        return new_obs, reward
+        return new_obs, reward, False
 
     def close(self):
         """Close the environment."""
