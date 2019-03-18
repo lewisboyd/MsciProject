@@ -66,7 +66,7 @@ class Ddpg:
         self.critic_optim = critic_optim
 
     def train(self, env, init_explore, max_steps, max_ep_steps,
-              model_folder, result_folder, data_folder=None,
+              updates_per_step, model_folder, result_folder, data_folder=None,
               plot_ylim=[-200, 0], eval_freq=1000, eval_ep=10):
         """Train the agent.
 
@@ -76,6 +76,8 @@ class Ddpg:
                                 buffer.
             max_steps (int): Maximum number of training steps.
             max_ep_steps (int): Maximum number of steps in one episode.
+            updates_per_step (int): How many updates to run per environment
+                                    step.
             model_folder (path): Folder to save models in during training.
             result_folder (path): Folder to save evaluation data.
             data_folder (path): If specified load to populate replay buffer.
@@ -192,7 +194,8 @@ class Ddpg:
                                  reward, self._done_to_tensor(done))
 
                 # Optimise agent
-                self._optimise()
+                for _ in range(updates_per_step):
+                    self._optimise()
 
                 # Update current state
                 state = next_state

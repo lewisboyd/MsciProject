@@ -22,6 +22,7 @@ if __name__ == '__main__':
     INIT_EXPLORE = 0
     MAX_STEPS = 50000
     MAX_EP_STEPS = 15
+    UPDATES_PER_STEP = 40
     DATA = (os.path.dirname(os.path.realpath(__file__))
             + "/baxter_center/data/")
     MODEL = (os.path.dirname(os.path.realpath(__file__))
@@ -53,4 +54,5 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN, REWARD_SCALE, ACTOR,
                  ACTOR_OPTIM, CRITIC, CRITIC_OPTIM, PREPROCESSOR)
     agent.train(ENVIRONMENT, INIT_EXPLORE, MAX_STEPS, MAX_EP_STEPS,
-                MODEL, RESULT, DATA, PLOT_YLIM, EVAL_FREQ, EVAL_EP)
+                UPDATES_PER_STEP, MODEL, RESULT, DATA, PLOT_YLIM, EVAL_FREQ,
+                EVAL_EP)

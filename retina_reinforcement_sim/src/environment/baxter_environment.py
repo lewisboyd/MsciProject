@@ -36,6 +36,7 @@ class BaxterEnvironment:
         self._left_cam = CameraController("/cameras/left_hand_camera/image",
                                           img_size)
         self._left_arm = baxter_interface.Limb('left')
+        self._left_arm.set_joint_position_speed(1.0)
         self._left_gripper = baxter_interface.Gripper('left')
         ns = "ExternalTools/left/PositionKinematicsNode/IKService"
         self._iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
