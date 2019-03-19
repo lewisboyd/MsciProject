@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<launch>
-
-  <!-- Resume the logic in baxter_world.launch -->
-  <include file="$(find baxter_gazebo)/launch/baxter_world.launch"/>
-
-</launch>

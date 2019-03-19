@@ -31,9 +31,12 @@ catkin_package(
 #############
 
 install(PROGRAMS
-   scripts/train_ddpg.py
-   scripts/test_environment.py
-   scripts/pendulum.py
+   scripts/baxter_gather_data.py
+   scripts/baxter_test_env.py
+   scripts/baxter_train.py
+   scripts/pendulum_gather_data.py
+   scripts/pendulum_train_srnet.py
+   scripts/pendulum_train.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
