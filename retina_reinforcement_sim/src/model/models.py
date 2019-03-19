@@ -225,7 +225,9 @@ class ActorMlp(nn.Module):
         # Create network
         super(ActorMlp, self).__init__()
         self.fc1 = nn.Linear(state_dim, 400)
+        self.ln1 = nn.LayerNorm(400)
         self.fc2 = nn.Linear(400, 300)
+        self.ln2 = nn.LayerNorm(300)
         self.fc3 = nn.Linear(300, action_dim)
 
         # Initialise weights
@@ -247,8 +249,14 @@ class ActorMlp(nn.Module):
             float tensor : Batch of action policies
 
         """
-        x = F.relu(self.fc1(batch))
-        x = F.relu(self.fc2(x))
+        x = self.fc1(batch)
+        x = self.ln1(x)
+        x = F.relu(x)
+
+        x = self.fc2(x)
+        x = self.ln2(x)
+        x = F.relu(x)
+
         x = self.fc3(x).tanh()
         return x
 
@@ -267,7 +275,9 @@ class CriticMlp(nn.Module):
         # Create network
         super(CriticMlp, self).__init__()
         self.fc1 = nn.Linear(state_dim, 400)
+        self.ln1 = nn.LayerNorm(400)
         self.fc2 = nn.Linear(400 + action_dim, 300)
+        self.ln1 = nn.LayerNorm(300)
         self.fc3 = nn.Linear(300, 1)
 
         # Initialise weights
@@ -290,8 +300,14 @@ class CriticMlp(nn.Module):
             float tensor : Batch of Q-values
 
         """
-        x = F.relu(self.fc1(state_batch))
+        x = self.fc1(state_batch)
+        x = self.ln1(x)
+        x = F.relu(x)
         x = torch.cat((x, action_batch), 1)
-        x = F.relu(self.fc2(x))
+
+        x = self.fc2(x)
+        x = self.ln2(x)
+        x = F.relu(x)
+
         x = self.fc3(x)
         return x
