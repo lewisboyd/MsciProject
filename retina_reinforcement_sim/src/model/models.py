@@ -277,7 +277,7 @@ class CriticMlp(nn.Module):
         self.fc1 = nn.Linear(state_dim, 400)
         self.ln1 = nn.LayerNorm(400)
         self.fc2 = nn.Linear(400 + action_dim, 300)
-        self.ln1 = nn.LayerNorm(300)
+        self.ln2 = nn.LayerNorm(300)
         self.fc3 = nn.Linear(300, 1)
 
         # Initialise weights

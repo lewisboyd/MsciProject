@@ -2,7 +2,7 @@
 
 import sys
 import random
-import timeit
+import time
 
 import cv2
 import rospy
@@ -41,7 +41,9 @@ def run_set_actions(waitTime=0, verbose=True):
     while not rospy.is_shutdown():
         i = (i + 1) % len(actions)
         action = actions[i]
+        s = time.time()
         state, reward, done = env.step(actions[i])
+        e = time.time()
         if verbose:
             print ""
             print "action: " + str(action)
@@ -49,6 +51,7 @@ def run_set_actions(waitTime=0, verbose=True):
             print "vert: " + str(state[1])
             print "reward: " + str(reward)
             print "done: " + str(done)
+            print "time: " + str(e - s)
         # Display camera image
         cv2.imshow("Feed", env.image)
         cv2.waitKey(waitTime)
@@ -61,7 +64,7 @@ def run_random(waitTime=0, verbose=True):
     rospy.on_shutdown(env.close)
     cv2.namedWindow("Feed", cv2.WINDOW_NORMAL)
 
-    # Run randomly untill interupted
+    # Run randomly untill interupteds = time.time()
     done = True
     while not rospy.is_shutdown():
         if done:
@@ -75,7 +78,9 @@ def run_random(waitTime=0, verbose=True):
         else:
             # Random action
             action = [random.uniform(-1, 1), random.uniform(-1, 1)]
+            s = time.time()
             state, reward, done = env.step(action)
+            e = time.time()
             if verbose:
                 print ""
                 print "action: " + str(action)
@@ -83,6 +88,7 @@ def run_random(waitTime=0, verbose=True):
                 print "vert: " + str(state[1])
                 print "reward: " + str(reward)
                 print "done: " + str(done)
+                print "time: " + str(e - s)
         # Display camera image
         cv2.imshow("Feed", env.image)
         cv2.waitKey(waitTime)
@@ -90,6 +96,6 @@ def run_random(waitTime=0, verbose=True):
 
 if __name__ == '__main__':
     try:
-        sys.exit(run_random(1))
+        sys.exit(run_set_actions(1))
     except rospy.ROSInterruptException:
         pass
