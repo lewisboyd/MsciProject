@@ -25,13 +25,13 @@ class CameraController:
         self.time = rospy.Time.now()
         rospy.Subscriber(img_topic, Image, self._callback, queue_size=1,
                          buff_size=20000000)
-        # buff_size = img_size[0] * img_size[1] * 3 * 1.25
+        # buff_size = 800 * 1280 * 3 * 1.25
         # rospy.Subscriber(img_topic, Image, self._callback, queue_size=1,
         #                  buff_size=buff_size)
 
     def _callback(self, image_data):
         if self.ready_for_data_event.is_set():
-            # if image_data.header.stamp - self.time > 0:
+            # if image_data.header.stamp - self.time >= 0:
             #     self.img_queue.put(image_data)
             #     self.ready_for_data_event.clear()
             self.img_queue.put(image_data)
