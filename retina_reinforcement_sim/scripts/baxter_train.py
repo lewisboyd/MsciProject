@@ -4,6 +4,7 @@ import os
 import rospy
 
 import torch
+import numpy as np
 
 from environment import BaxterEnvironment
 from model import (ActorMlp, CriticMlp)
@@ -12,6 +13,12 @@ from training import (Ddpg, BaxterPreprocessor, NormalActionNoise)
 
 if __name__ == '__main__':
     rospy.init_node("training process")
+
+    # Set seeds
+    torch.manual_seed(12)
+    torch.cuda.manual_seed(12)
+    np.random.seed(12)
+    random.seed(12)
 
     # Environment variables
     STATE_DIM = 2

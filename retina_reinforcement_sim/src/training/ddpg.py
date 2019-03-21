@@ -15,7 +15,8 @@ class Ddpg:
 
     def __init__(self, memory_capacity, batch_size, noise_function, init_noise,
                  final_noise, exploration_len, reward_scale, actor,
-                 actor_optim, critic, critic_optim, preprocessor):
+                 actor_optim, critic, critic_optim, preprocessor,
+                 s_normalizer=None, r_normalizer=None):
         """Initialise networks, memory and training params.
 
         Args:
@@ -32,6 +33,8 @@ class Ddpg:
             critic (object): Critic network
             critic_optimm (array): Optimiser for critic
             preprocessor (object): Function to process environment observation
+            s_normalizer (object): Function to normalize observation
+            r_normalizer (object): Function to normalize rewards
         """
         # Experience Replay
         self.memory = ReplayMemory(memory_capacity)
@@ -65,9 +68,13 @@ class Ddpg:
         self.critic_target = copy.deepcopy(critic).to(self.device)
         self.critic_optim = critic_optim
 
+        # Running mean and std normalization
+        self.s_normalizer = s_normalizer
+        self.r_normalizer = r_normalizer
+
     def train(self, env, init_explore, max_steps, max_ep_steps,
               updates_per_step, model_folder, result_folder, data_folder=None,
-              eval_freq=5000, eval_ep=10):
+              eval_freq=5000, eval_ep=10, checkpoint=None):
         """Train the agent.
 
         Args:
@@ -84,6 +91,7 @@ class Ddpg:
             eval_freq (int): How many timesteps of training before next
                              evaluation.
             eval_ep (int): How many episodes to run for evaluation.
+            checkpoint (int): Checkpoint to restart training from
         """
         start = time.time()
 
@@ -103,6 +111,10 @@ class Ddpg:
             print "Loading data from folder: %s" % data_folder
             self._load_data(data_folder)
 
+        if checkpoint:
+            # Reload from checkpoint
+            self._load(self, model_folder, checkpoint)
+
         if init_explore > 0:
             # Prepopulate experience replay using noise function
             print "Prepopulating experience replay"
@@ -111,6 +123,8 @@ class Ddpg:
             done = False
             self.noise_function.reset()
             state = self.preprocessor(env.reset()).to(self.device)
+            if self.s_normalizer:
+                self.s_normalizer.observe(state)
             while timestep_t < init_explore:
                 timestep_t = timestep_t + 1
                 timestep_ep = timestep_ep + 1
@@ -119,6 +133,8 @@ class Ddpg:
                     # Reset environment
                     self.noise_function.reset()
                     state = self.preprocessor(env.reset()).to(self.device)
+                    if self.s_normalizer:
+                        self.s_normalizer.observe(state)
                     timestep_ep = 0
 
                 # Step through environment
@@ -126,6 +142,8 @@ class Ddpg:
                                       device=self.device,
                                       dtype=torch.float).clamp(-1, 1)
                 next_obs, reward, done = env.step(action.cpu())
+                if self.r_normalizer:
+                    self.r_normalizer.observe(reward)
                 done = done or (timestep_ep == max_ep_steps)
 
                 # Convert to tensors and save
@@ -149,14 +167,16 @@ class Ddpg:
             ep_p_losses = []
             self.noise_function.reset()
             state = self.preprocessor(env.reset()).to(self.device)
+            if self.s_normalizer:
+                self.s_normalizer.observe(state)
 
             # Run training loop
             while timestep_t < max_steps:
 
                 if done:
                     # Report episode performance
-                    q_loss /= (timestep_t * updates_per_step)
-                    p_loss /= (timestep_t * updates_per_step)
+                    q_loss /= (timestep_ep * updates_per_step)
+                    p_loss /= (timestep_ep * updates_per_step)
                     ep_q_losses.append(q_loss)
                     ep_p_losses.append(p_loss)
                     print "Timestep: %7d/%7d Episode: %4d Reward: %0.2f Critic Loss: %0.3f Actor Loss: %0.3f" % (
@@ -165,6 +185,8 @@ class Ddpg:
                     # Reset the environment
                     self.noise_function.reset()
                     state = self.preprocessor(env.reset()).to(self.device)
+                    if self.s_normalizer:
+                        self.s_normalizer.observe(state)
                     timestep_ep = 0
                     ep_reward = 0.
                     q_loss = 0.0
@@ -195,6 +217,8 @@ class Ddpg:
                     # Reset the environment
                     self.noise_function.reset()
                     state = self.preprocessor(env.reset()).to(self.device)
+                    if self.s_normalizer:
+                        self.s_normalizer.observe(state)
                     timestep_ep = 0
                     ep_reward = 0.
                     q_loss = 0.0
@@ -206,6 +230,8 @@ class Ddpg:
                 timestep_ep = timestep_ep + 1
                 action = self._get_exploration_action(state)
                 next_obs, reward, done = env.step(action.cpu())
+                if self.r_normalizer:
+                    self.r_normalizer.observe(reward)
                 done = done or (timestep_ep == max_ep_steps)
                 ep_reward += reward
 
@@ -266,6 +292,13 @@ class Ddpg:
         next_state_batch = torch.stack(batch.next_state)
         done_batch = torch.stack(batch.done)
 
+        # Normalize
+        if self.s_normalizer:
+            state_batch = self.s_normalizer.normalize(state_batch)
+            next_state_batch = self.s_normalizer.normalize(next_state_batch)
+        if self.r_normalizer:
+            reward_batch = self.r_normalizer.normalize(reward_batch)
+
         # Compute critic loss
         with torch.no_grad():
             next_q = self.critic_target(
@@ -322,14 +355,18 @@ class Ddpg:
 
     def _get_exploitation_action(self, state):
         with torch.no_grad():
+            if self.s_normalizer:
+                state = self.s_normalizer.normalize(state)
             self.actor.eval()
-            # action = self.actor(state.unsqueeze(0)).view(1)
             action = self.actor(state.unsqueeze(0)).squeeze(0)
             self.actor.train()
             return action
 
     def _get_exploration_action(self, state):
         with torch.no_grad():
+            if self.s_normalizer:
+                state = self.s_normalizer.normalize(state)
+
             noise_values = torch.tensor(
                 self.noise_function(), device=self.device)
             if self.noise > self.final_noise:
@@ -341,8 +378,18 @@ class Ddpg:
             return noisy_action.clamp(-1, 1)
 
     def _save(self, path, id):
-        torch.save(self.actor.state_dict(), path + "actor_" + id)
-        torch.save(self.critic.state_dict(), path + "critic_" + id)
+        torch.save(self.actor.state_dict(), path + id + "_actor")
+        torch.save(self.critic.state_dict(), path  + id + "_critic")
+        if self.s_normalizer:
+            self.s_normalizer.save(path + id)
+
+    def _load(self, path, checkpoint):
+        self.actor.load_state_dict(torch.load(path + checkpoint + "_actor"))
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.critic.load_state_dict(torch.load(path + checkpoint + "_critic"))
+        self.critic_target.load_state_dict(self.actor.state_dict())
+        if self.s_normalizer:
+            self.s_normalizer.load(path + checkpoint)
 
     def _soft_update(self, target, source):
         for target_param, param in zip(target.parameters(),
