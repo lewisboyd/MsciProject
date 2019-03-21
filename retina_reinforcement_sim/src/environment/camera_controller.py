@@ -29,7 +29,7 @@ class CameraController:
 
     def _callback(self, image_data):
         if self.ready_for_data_event.is_set():
-            if (image_data.header.stamp - self.time).to_sec() >= 0:
+            if (image_data.header.stamp - self.time).to_sec() >= 0.2:
                 self.img_queue.put(image_data)
                 self.ready_for_data_event.clear()
 

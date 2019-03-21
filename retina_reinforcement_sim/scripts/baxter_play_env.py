@@ -29,10 +29,9 @@ def run():
         if done:
             # Reset environment
             state = env.reset()
-            if verbose:
-                print ""
-                print "horiz: " + str(state[0])
-                print "vert: " + str(state[1])
+            print ""
+            print "horiz: " + str(state[0])
+            print "vert: " + str(state[1])
             done = False
             ep_step = 0
         else:
@@ -53,11 +52,11 @@ def run():
 
         # Display image until key pressed
         cv2.imshow("Feed", env.image)
-        key = cv2.waitKey(waitTime)
+        key = cv2.waitKey(0)
 
         # If 'esc' pressed exit program
         if key == 27:
-            break;
+            break
 
 
 if __name__ == '__main__':

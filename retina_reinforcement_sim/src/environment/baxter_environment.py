@@ -108,7 +108,7 @@ class BaxterEnvironment:
         # Calculate reward and if episode finished
         reward = 0.
         done = False
-        if self.horiz_dist:
+        if self.horiz_dist is not None:
             # If object visible calculate reward based on distances
             reward -= abs(self.horiz_dist)
             reward -= abs(self.vert_dist)
