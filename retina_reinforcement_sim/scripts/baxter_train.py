@@ -29,17 +29,16 @@ if __name__ == '__main__':
              + "/baxter_center/mlp_normRs/state_dicts/")
     RESULT = (os.path.dirname(os.path.realpath(__file__))
               + "/baxter_center/mlp_normRs/results/")
-    PLOT_YLIM = [-30, 0]
-    EVAL_FREQ = 40
+    EVAL_FREQ = 5000
     EVAL_EP = 10
 
     # Agent variables
     REPLAY_SIZE = 100000
-    BATCH_SIZE = 64
+    BATCH_SIZE = 1024
     NOISE_FUNCTION = NormalActionNoise(actions=ACTION_DIM)
     INIT_NOISE = 1
     FINAL_NOISE = 0.02
-    EXPLORATION_LEN = MAX_STEPS / 2
+    EXPLORATION_LEN = (MAX_STEPS * 0.75)
     REWARD_SCALE = 1.0
     ACTOR = ActorMlp(STATE_DIM, ACTION_DIM).cuda()
     ACTOR_OPTIM = torch.optim.Adam(ACTOR.parameters(), 0.0001)
@@ -54,5 +53,5 @@ if __name__ == '__main__':
                  FINAL_NOISE, EXPLORATION_LEN, REWARD_SCALE, ACTOR,
                  ACTOR_OPTIM, CRITIC, CRITIC_OPTIM, PREPROCESSOR)
     agent.train(ENVIRONMENT, INIT_EXPLORE, MAX_STEPS, MAX_EP_STEPS,
-                UPDATES_PER_STEP, MODEL, RESULT, DATA, PLOT_YLIM, EVAL_FREQ,
+                UPDATES_PER_STEP, MODEL, RESULT, DATA, EVAL_FREQ,
                 EVAL_EP)

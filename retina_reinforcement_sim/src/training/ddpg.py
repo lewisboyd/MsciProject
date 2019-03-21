@@ -67,7 +67,7 @@ class Ddpg:
 
     def train(self, env, init_explore, max_steps, max_ep_steps,
               updates_per_step, model_folder, result_folder, data_folder=None,
-              plot_ylim=[-200, 0], eval_freq=40, eval_ep=10):
+              eval_freq=5000, eval_ep=10):
         """Train the agent.
 
         Args:
@@ -81,29 +81,30 @@ class Ddpg:
             model_folder (path): Folder to save models in during training.
             result_folder (path): Folder to save evaluation data.
             data_folder (path): If specified load to populate replay buffer.
-            plot_ylim (array): Min and max value for episode reward axis.
-            eval_freq (int): How many episodes of training before next
+            eval_freq (int): How many timesteps of training before next
                              evaluation.
             eval_ep (int): How many episodes to run for evaluation.
         """
+        start = time.time()
+
         # Create folders for saving data
         if model_folder is not None and not os.path.isdir(model_folder):
             os.makedirs(model_folder)
         if result_folder is not None and not os.path.isdir(result_folder):
             os.makedirs(result_folder)
 
-        # Create interactive plot
-        reward_plot = self._create_plot(max_steps, plot_ylim)
+        # Create arrays to store training data
+        validation_rewards = []
+        ep_q_losses = []
+        ep_p_losses = []
 
-        start = time.time()
-
-        # If given a data folder prepopulate the experience replay
         if data_folder is not None:
+            # Prepopulate experience replay from data folder
             print "Loading data from folder: %s" % data_folder
             self._load_data(data_folder)
 
-        # Populate replay buffer using noise function
         if init_explore > 0:
+            # Prepopulate experience replay using noise function
             print "Prepopulating experience replay"
             timestep_t = 0
             timestep_ep = 0
@@ -114,8 +115,8 @@ class Ddpg:
                 timestep_t = timestep_t + 1
                 timestep_ep = timestep_ep + 1
 
-                # When episode finished reset environment and noise function
                 if done:
+                    # Reset environment
                     self.noise_function.reset()
                     state = self.preprocessor(env.reset()).to(self.device)
                     timestep_ep = 0
@@ -136,45 +137,68 @@ class Ddpg:
                 # Update current state
                 state = next_state
 
-        # Evaluate initial performance
-        print "Evaluating initial performance"
-        eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
-        self._update_plot(reward_plot, 0, eval_reward)
-        print "Initial Performance: %0.2f" % eval_reward
-
-        # Run training loop
         try:
             ep = 1
+            eval_t = 0.0
             timestep_t = 0
             timestep_ep = 0
             ep_reward = 0.
             done = False
+            q_loss = 0.0
+            p_loss = 0.0
+            ep_p_losses = []
             self.noise_function.reset()
             state = self.preprocessor(env.reset()).to(self.device)
+
+            # Run training loop
             while timestep_t < max_steps:
+
                 if done:
                     # Report episode performance
-                    print "Timestep: %6d/%6d Episode: %4d  Reward: %0.2f" % (
-                        timestep_t, max_steps, ep, ep_reward)
+                    q_loss /= (timestep_t * updates_per_step)
+                    p_loss /= (timestep_t * updates_per_step)
+                    ep_q_losses.append(q_loss)
+                    ep_p_losses.append(p_loss)
+                    print "Timestep: %7d/%7d Episode: %4d Reward: %0.2f Critic Loss: %0.3f Actor Loss: %0.3f" % (
+                        timestep_t, max_steps, ep, ep_reward, q_loss, p_loss)
 
                     # Reset the environment
                     self.noise_function.reset()
                     state = self.preprocessor(env.reset()).to(self.device)
                     timestep_ep = 0
                     ep_reward = 0.
-
-                    # Run evaluation if enough timesteps have passed
-                    if ep % eval_freq == 0:
-                        eval_reward = self._evaluate(
-                            env, max_ep_steps, eval_ep)
-                        self._update_plot(
-                            reward_plot, timestep_t, eval_reward)
-                        if (model_folder is not None
-                                and not timestep_t == max_steps):
-                            self._save(model_folder, str(ep))
-                        print "Evaluation Reward: %0.2f" % eval_reward
-
+                    q_loss = 0.0
+                    p_loss = 0.0
                     ep = ep + 1
+
+                if timestep_t == 0 or timestep_t % eval_t == 0:
+                    # Evaluate performance
+                    eval_reward = self._evaluate(
+                        env, max_ep_steps, eval_ep)
+                    validation_rewards.append(eval_reward)
+
+                    # Report performance
+                    print "Evaluation Reward: %0.2f" % eval_reward
+
+                    if (model_folder is not None
+                            and not timestep_t == max_steps):
+                        # Save model
+                        self._save(model_folder, str(eval_t))
+                    if (result_folder is not None
+                        and not timestep_t == max_steps):
+                        # Save training data
+                        np.save(result_folder + "q_loss", ep_q_losses)
+                        np.save(result_folder + "p_loss", ep_p_losses)
+                        np.save(result_folder + "ep_reward", validation_rewards)
+
+                    # Reset the environment
+                    self.noise_function.reset()
+                    state = self.preprocessor(env.reset()).to(self.device)
+                    timestep_ep = 0
+                    ep_reward = 0.
+                    q_loss = 0.0
+                    p_loss = 0.0
+                    eval_t += eval_freq
 
                 # Step through environment
                 timestep_t = timestep_t + 1
@@ -192,32 +216,36 @@ class Ddpg:
 
                 # Optimise agent
                 for _ in range(updates_per_step):
-                    self._optimise()
+                    critic_loss, actor_loss = self._optimise()
+                    q_loss += critic_loss
+                    p_loss += actor_loss
 
                 # Update current state
                 state = next_state
         finally:
-            # Evaluate final performance
-            print "Evaluating final performance"
-            eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
-            self._update_plot(reward_plot, str(max_steps), eval_reward)
-            print "Final Performance: %0.2f" % eval_reward
+            try:
+                # Evaluate final performance
+                eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
+                validation_rewards.append(eval_reward)
+                print "Final Performance: %0.2f" % eval_reward
+            except:
+                pass
 
             if result_folder is not None:
-                # Save figure and data
-                plt.savefig(result_folder + "training_performance.png")
-                reward_plot.get_xdata().tofile(result_folder
-                                               + "eval_timesteps.txt")
-                reward_plot.get_ydata().tofile(result_folder
-                                               + "eval_rewards.txt")
+                # Save all training data
+                np.save(result_folder + "q_loss", ep_q_losses)
+                np.save(result_folder + "p_loss", ep_p_losses)
+                np.save(result_folder + "ep_reward", validation_rewards)
 
-            # Save the model
             if model_folder is not None:
+                # Save the model
                 self._save(model_folder, str(max_steps))
 
-            # Close figure and environment
-            plt.clf()
-            env.close()
+            try:
+                # Close environment
+                env.close()
+            except:
+                pass
 
             # Report training time
             end = time.time()
@@ -252,8 +280,8 @@ class Ddpg:
         self.critic_optim.step()
 
         # Compute actor loss
-        actor_loss = -self.critic(state_batch,
-                                  self.actor(state_batch)).mean()
+        actor_loss = -(self.critic(state_batch,
+                                  self.actor(state_batch))).mean()
 
         # Optimise actor
         self.actor_optim.zero_grad()
@@ -263,6 +291,8 @@ class Ddpg:
         # Soft update
         self._soft_update(self.critic_target, self.critic)
         self._soft_update(self.actor_target, self.actor)
+
+        return critic_loss.item(), actor_loss.item(),
 
     def _reward_to_tensor(self, reward):
         return torch.tensor([reward * self.reward_scale],
@@ -305,7 +335,6 @@ class Ddpg:
                 self.noise -= self.noise_decay
                 if self.noise < self.final_noise:
                     self.noise = self.final_noise
-            # action = self.actor(state.unsqueeze(0)).view(1)
             action = self.actor(state.unsqueeze(0)).squeeze(0)
             noisy_action = action + self.noise * noise_values.float()
             return noisy_action.clamp(-1, 1)
