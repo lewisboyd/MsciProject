@@ -139,7 +139,7 @@ class Ddpg:
 
         try:
             ep = 1
-            eval_t = 0.0
+            eval_t = 0
             timestep_t = 0
             timestep_ep = 0
             ep_reward = 0.
@@ -155,8 +155,8 @@ class Ddpg:
 
                 if done:
                     # Report episode performance
-                    q_loss /= (timestep_ep * updates_per_step)
-                    p_loss /= (timestep_ep * updates_per_step)
+                    q_loss /= (timestep_t * updates_per_step)
+                    p_loss /= (timestep_t * updates_per_step)
                     ep_q_losses.append(q_loss)
                     ep_p_losses.append(p_loss)
                     print "Timestep: %7d/%7d Episode: %4d Reward: %0.2f Critic Loss: %0.3f Actor Loss: %0.3f" % (
@@ -185,11 +185,12 @@ class Ddpg:
                         # Save model
                         self._save(model_folder, str(eval_t))
                     if (result_folder is not None
-                        and not timestep_t == max_steps):
+                            and not timestep_t == max_steps):
                         # Save training data
                         np.save(result_folder + "q_loss", ep_q_losses)
                         np.save(result_folder + "p_loss", ep_p_losses)
-                        np.save(result_folder + "ep_reward", validation_rewards)
+                        np.save(result_folder + "ep_reward",
+                                validation_rewards)
 
                     # Reset the environment
                     self.noise_function.reset()
@@ -281,7 +282,7 @@ class Ddpg:
 
         # Compute actor loss
         actor_loss = -(self.critic(state_batch,
-                                  self.actor(state_batch))).mean()
+                                   self.actor(state_batch))).mean()
 
         # Optimise actor
         self.actor_optim.zero_grad()

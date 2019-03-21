@@ -19,12 +19,13 @@ if __name__ == '__main__':
 
     # Training variables
     ENVIRONMENT = BaxterEnvironment()
-    INIT_EXPLORE = 0
+    INIT_EXPLORE = 150
     MAX_STEPS = 500000
     MAX_EP_STEPS = 15
     UPDATES_PER_STEP = 1
     DATA = (os.path.dirname(os.path.realpath(__file__))
             + "/baxter_center/data/")
+    DATA = None
     MODEL = (os.path.dirname(os.path.realpath(__file__))
              + "/baxter_center/mlp_normRs/state_dicts/")
     RESULT = (os.path.dirname(os.path.realpath(__file__))
@@ -34,7 +35,7 @@ if __name__ == '__main__':
 
     # Agent variables
     REPLAY_SIZE = 1000000
-    BATCH_SIZE = 124
+    BATCH_SIZE = 128
     NOISE_FUNCTION = NormalActionNoise(actions=ACTION_DIM)
     INIT_NOISE = 1.0
     FINAL_NOISE = 0.02
