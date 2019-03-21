@@ -126,12 +126,12 @@ class BaxterEnvironment:
             #     done = True
 
             # If accurate enough then end the episode
-            if (abs(self.vert_dist) < self._vert_threshold
-                    and abs(self.horiz_dist) < self._horiz_threshold):
-                done = True
+            # if (abs(self.vert_dist) < self._vert_threshold
+            #         and abs(self.horiz_dist) < self._horiz_threshold):
+            #     done = True
         else:
             # If lost sight of object then end episode and return heavy penalty
-            reward = -500
+            reward = -100
             done = True
 
         return [self.horiz_dist, self.vert_dist], reward, done
@@ -258,7 +258,8 @@ class BaxterEnvironment:
             timeout=2.0,
             rate=100,
             raise_on_error=False,
-            body=lambda: self._left_arm.set_joint_positions(joint_angles)
+            body=lambda: self._left_arm.set_joint_positions(joint_angles,
+                                                            raw=True)
         )
 
     def _move_block(self):

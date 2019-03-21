@@ -155,8 +155,8 @@ class Ddpg:
 
                 if done:
                     # Report episode performance
-                    q_loss /= (timestep_t * updates_per_step)
-                    p_loss /= (timestep_t * updates_per_step)
+                    q_loss /= (timestep_ep * updates_per_step)
+                    p_loss /= (timestep_ep * updates_per_step)
                     ep_q_losses.append(q_loss)
                     ep_p_losses.append(p_loss)
                     print "Timestep: %7d/%7d Episode: %4d Reward: %0.2f Critic Loss: %0.3f Actor Loss: %0.3f" % (

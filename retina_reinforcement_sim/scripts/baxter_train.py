@@ -20,9 +20,9 @@ if __name__ == '__main__':
     # Training variables
     ENVIRONMENT = BaxterEnvironment()
     INIT_EXPLORE = 0
-    MAX_STEPS = 50000
+    MAX_STEPS = 500000
     MAX_EP_STEPS = 15
-    UPDATES_PER_STEP = 40
+    UPDATES_PER_STEP = 1
     DATA = (os.path.dirname(os.path.realpath(__file__))
             + "/baxter_center/data/")
     MODEL = (os.path.dirname(os.path.realpath(__file__))
@@ -33,10 +33,10 @@ if __name__ == '__main__':
     EVAL_EP = 10
 
     # Agent variables
-    REPLAY_SIZE = 100000
-    BATCH_SIZE = 1024
+    REPLAY_SIZE = 1000000
+    BATCH_SIZE = 124
     NOISE_FUNCTION = NormalActionNoise(actions=ACTION_DIM)
-    INIT_NOISE = 1
+    INIT_NOISE = 1.0
     FINAL_NOISE = 0.02
     EXPLORATION_LEN = (MAX_STEPS * 0.75)
     REWARD_SCALE = 1.0
