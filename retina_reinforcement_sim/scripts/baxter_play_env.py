@@ -24,6 +24,7 @@ def run():
     # Run until interupted or 'esc' pressed
     done = True
     key = None
+    ep_step = 0
     while not rospy.is_shutdown():
         if done:
             # Reset environment
@@ -33,8 +34,11 @@ def run():
                 print "horiz: " + str(state[0])
                 print "vert: " + str(state[1])
             done = False
+            ep_step = 0
         else:
             if key in actions:
+                ep_step = ep_step + 1
+
                 # If valid key pressed execute corresponding action
                 action = actions[key]
                 state, reward, done = env.step(action)
@@ -44,6 +48,8 @@ def run():
                 print "vert: " + str(state[1])
                 print "reward: " + str(reward)
                 print "done: " + str(done)
+
+                done = done or (ep_step == 15)
 
         # Display image until key pressed
         cv2.imshow("Feed", env.image)
