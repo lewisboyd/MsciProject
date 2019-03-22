@@ -19,7 +19,9 @@ def run():
 
     # Key action mapping
     actions = {ord('a'): [0.1, 0], ord('s'): [-0.1, 0],
-               ord('d'): [0, 0.1], ord('f'): [0, -0.1]}
+               ord('d'): [0, 0.1], ord('f'): [0, -0.1],
+               ord('q'): [0.3, 0], ord('w'): [-0.3, 0],
+               ord('e'): [0, 0.3], ord('r'): [0, -0.3]}
 
     # Run until interupted or 'esc' pressed
     done = True
@@ -32,6 +34,8 @@ def run():
             print ""
             print "horiz: " + str(state[0])
             print "vert: " + str(state[1])
+            print "x pos: " + str(state[2])
+            print "y pos: " + str(state[3])
             done = False
             ep_step = 0
         else:
@@ -45,6 +49,8 @@ def run():
                 print "action: " + str(action)
                 print "horiz: " + str(state[0])
                 print "vert: " + str(state[1])
+                print "x pos: " + str(state[2])
+                print "y pos: " + str(state[3])
                 print "reward: " + str(reward)
                 print "done: " + str(done)
 
