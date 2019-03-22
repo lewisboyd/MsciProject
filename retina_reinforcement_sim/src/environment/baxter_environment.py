@@ -117,8 +117,8 @@ class BaxterEnvironment:
             done = True
         else:
             # Return positive reward based on distances
-            reward += 1 - abs(self.horiz_dist)
-            reward += 1 - abs(self.vert_dist)
+            reward += 0.5 * (1 - abs(self.horiz_dist))
+            reward += 0.5 * (1 - abs(self.vert_dist))
             # if self.depth_dist < self._min_depth_threshold:
             #     reward -= 1
             # else:
@@ -152,9 +152,15 @@ class BaxterEnvironment:
 
         # Update cartesian coordinates
         pose = self._left_arm.endpoint_pose()
-        self.x_pos = pose['position'].x
-        self.y_pos = pose['position'].y
+
+        # x: 0.300(close) to 0.820(far)
+        # y: -0.370 (right) to 0.850(left)
+        # self.x_pos = pose['position'].x
+        # self.y_pos = pose['position'].y
         self.z_pos = pose['position'].z
+
+        self.x_pos = (2 / 0.52) * (pose['position'].x - 0.820) + 1
+        self.y_pos = (2 / 1.22) * (pose['position'].y - 0.850) + 1
         # euler = self._get_euler(
         #     pose['orientation'])
         # euler = euler_from_quaternion(pose['orientation'])
@@ -193,8 +199,9 @@ class BaxterEnvironment:
 
     def _get_joint_angles(self, action):
         # Calculate desired endpoint position of arm
-        x = self.x_pos + action[0] * self._x_lim
-        y = self.y_pos + action[1] * self._y_lim
+        pose = self._left_arm.endpoint_pose()
+        x = pose['position'].x + action[0] * self._x_lim
+        y = pose['position'].y + action[1] * self._y_lim
         # z = self.z_pos + action[2] * self._z_lim
 
         # Create pose of desired position
