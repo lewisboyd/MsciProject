@@ -90,13 +90,13 @@ class BaxterEnvironment:
             self._move_block()
             self._update_state()
             visible = self.horiz_dist is not None
-        return [self.horiz_dist, self.vert_dist]
+        return self._get_state()
 
     def step(self, action):
         """Attempt to execute the action.
 
         Returns:
-            observation, low state descriptor, reward, done
+            state, reward, done
 
         """
         # Make move if possible and update observation/state
@@ -105,13 +105,20 @@ class BaxterEnvironment:
             self._move_arm(joint_angles)
         self._update_state()
 
-        # Calculate reward and if episode finished
+        # Calculate reward and if new episode should be started
         reward = 0.
         done = False
-        if self.horiz_dist is not None:
-            # If object visible calculate reward based on distances
-            reward -= abs(self.horiz_dist)
-            reward -= abs(self.vert_dist)
+        if not joint_angles:
+            # Invalid move return small penalty
+            reward = -0.5
+        elif self.horiz_dist is None:
+            # Lost sight of object, end episode and return larger penalty
+            reward = -1
+            done = True
+        else:
+            # Return positive reward based on distances
+            reward += 1 - abs(self.horiz_dist)
+            reward += 1 - abs(self.vert_dist)
             # if self.depth_dist < self._min_depth_threshold:
             #     reward -= 1
             # else:
@@ -129,16 +136,15 @@ class BaxterEnvironment:
             # if (abs(self.vert_dist) < self._vert_threshold
             #         and abs(self.horiz_dist) < self._horiz_threshold):
             #     done = True
-        else:
-            # If lost sight of object then end episode and return heavy penalty
-            reward = -100
-            done = True
 
-        return [self.horiz_dist, self.vert_dist], reward, done
+        return self._get_state(), reward, done
 
     def close(self):
         """Delete loaded models. To be called when node is shutting down."""
         self._delete_gazebo_models()
+
+    def _get_state(self):
+        return [self.horiz_dist, self.vert_dist, self.x_pos, self.y_pos]
 
     def _update_state(self):
         # Update image
