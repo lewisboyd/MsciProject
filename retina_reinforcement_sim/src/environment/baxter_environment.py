@@ -72,8 +72,8 @@ class BaxterEnvironment:
         self._obj_z_pos = None
 
         # Limit on endpoint movements
-        self._x_lim = 0.2
-        self._y_lim = 0.3
+        self._x_lim = 0.1
+        self._y_lim = 0.15
         self._z_lim = 0.4
 
     def reset(self):
@@ -158,7 +158,6 @@ class BaxterEnvironment:
         # self.x_pos = pose['position'].x
         # self.y_pos = pose['position'].y
         self.z_pos = pose['position'].z
-
         self.x_pos = (2 / 0.52) * (pose['position'].x - 0.820) + 1
         self.y_pos = (2 / 1.22) * (pose['position'].y - 0.850) + 1
         # euler = self._get_euler(

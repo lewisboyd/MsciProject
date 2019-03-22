@@ -24,7 +24,7 @@ class BaxterPreprocessor:
         """Return observation in a tensor."""
         # The baxter environment may return None when episode finishes
         if None in obs:
-            return torch.tensor([0, 0], dtype=torch.float)
+            return torch.tensor([0, 0, 0, 0], dtype=torch.float)
         return torch.tensor(obs, dtype=torch.float)
 
 
