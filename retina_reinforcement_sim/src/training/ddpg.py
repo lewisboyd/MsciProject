@@ -113,7 +113,7 @@ class Ddpg:
 
         if checkpoint:
             # Reload from checkpoint
-            self._load(self, model_folder, checkpoint)
+            self._load(model_folder, checkpoint)
 
         if init_explore > 0:
             # Prepopulate experience replay using noise function
@@ -379,7 +379,7 @@ class Ddpg:
 
     def _save(self, path, id):
         torch.save(self.actor.state_dict(), path + id + "_actor")
-        torch.save(self.critic.state_dict(), path  + id + "_critic")
+        torch.save(self.critic.state_dict(), path + id + "_critic")
         if self.s_normalizer:
             self.s_normalizer.save(path + id)
 
@@ -387,7 +387,7 @@ class Ddpg:
         self.actor.load_state_dict(torch.load(path + checkpoint + "_actor"))
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic.load_state_dict(torch.load(path + checkpoint + "_critic"))
-        self.critic_target.load_state_dict(self.actor.state_dict())
+        self.critic_target.load_state_dict(self.critic.state_dict())
         if self.s_normalizer:
             self.s_normalizer.load(path + checkpoint)
 
