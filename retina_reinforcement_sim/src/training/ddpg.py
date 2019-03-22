@@ -155,10 +155,10 @@ class Ddpg:
                 # Update current state
                 state = next_state
 
+        timestep_t = 0
         try:
             ep = 1
             eval_t = 0
-            timestep_t = 0
             timestep_ep = 0
             ep_reward = 0.
             done = False
@@ -266,7 +266,7 @@ class Ddpg:
 
             if model_folder is not None:
                 # Save the model
-                self._save(model_folder, str(max_steps))
+                self._save(model_folder, str(timestep_t))
 
             try:
                 # Close environment
