@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     else:
         # Set common titles
-        fig, ax = plt.subplots(len(folders), 3)
+        fig, ax = plt.subplots(len(folders)+1, 3)
         ax[0, 0].set_title("Evaluation rewards")
         ax[0, 1].set_title("Critic loss")
         ax[0, 2].set_title("Actor loss")
@@ -57,6 +57,9 @@ if __name__ == '__main__':
             validation_rewards = np.load(folder + "/ep_reward.npy")
 
             # Plot data
+            ax[len(folders), 0].plot(validation_rewards)
+            ax[len(folders), 1].plot(ep_q_losses)
+            ax[len(folders), 2].plot(ep_p_losses)
             ax[row, 0].plot(validation_rewards)
             ax[row, 1].plot(ep_q_losses)
             ax[row, 2].plot(ep_p_losses)
@@ -68,6 +71,11 @@ if __name__ == '__main__':
 
             # Move to next row
             row = row + 1
+
+        # Remove x labels
+        ax[len(folders), 0].get_xaxis().set_visible(False)
+        ax[len(folders), 1].get_xaxis().set_visible(False)
+        ax[len(folders), 2].get_xaxis().set_visible(False)
 
         # Display
         fig.tight_layout()
