@@ -1,4 +1,5 @@
 from ddpg import Ddpg
+from ddpg_her import DdpgHer
 from memory import ReplayMemory
 from noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 from normalizer import Normalizer
