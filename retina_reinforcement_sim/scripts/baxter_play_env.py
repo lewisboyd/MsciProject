@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import random
-import time
 
 import cv2
 import rospy
@@ -20,8 +18,8 @@ def run():
     # Key action mapping
     actions = {ord('a'): [0.1, 0], ord('s'): [-0.1, 0],
                ord('d'): [0, 0.1], ord('f'): [0, -0.1],
-               ord('q'): [0.3, 0], ord('w'): [-0.3, 0],
-               ord('e'): [0, 0.3], ord('r'): [0, -0.3]}
+               ord('q'): [1, 0], ord('w'): [-1, 0],
+               ord('e'): [0, 1], ord('r'): [0, -1]}
 
     # Run until interupted or 'esc' pressed
     done = True

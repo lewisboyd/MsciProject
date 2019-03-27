@@ -51,14 +51,9 @@ class BaxterEnvironment:
         self.x_pos = None
         self.y_pos = None
         self.z_pos = None
-
-        # State information
         self.horiz_dist = None
         self.vert_dist = None
         self.depth_dist = None
-
-        # Maximum state values
-        self._max_depth_dist = None
 
         # Accuracy tollerance
         self._horiz_threshold = 0.05
@@ -72,9 +67,15 @@ class BaxterEnvironment:
         self._obj_z_pos = None
 
         # Limit on endpoint movements
-        self._x_lim = 0.1
-        self._y_lim = 0.15
-        self._z_lim = 0.4
+        self._x_move_lim = 0.28
+        self._y_move_lim = 0.40
+
+        # Limits on endpoint position relative to object
+        self._x_dist_lim = 0.28
+        self._y_dist_lim = 0.40
+
+        # Limit on endpoint position relative to body
+        self._x_pos_min = 0.36
 
     def reset(self):
         """Reset arm position and move object to random location.
@@ -108,34 +109,14 @@ class BaxterEnvironment:
         # Calculate reward and if new episode should be started
         reward = 0.
         done = False
-        if not joint_angles:
-            # Invalid move return small penalty
-            reward = -0.5
-        elif self.horiz_dist is None:
+        if self.horiz_dist is None:
             # Lost sight of object, end episode and return larger penalty
-            reward = -1
+            reward = -3
             done = True
         else:
-            # Return positive reward based on distances
-            reward += 0.5 * (1 - abs(self.horiz_dist))
-            reward += 0.5 * (1 - abs(self.vert_dist))
-            # if self.depth_dist < self._min_depth_threshold:
-            #     reward -= 1
-            # else:
-            #     reward -= ((self.depth_dist - self.__min_depth_threshold)
-            #                / self._max_depth_dist)
-
-            # If sufficiently accurate then episode is finished
-            # if (self.vert_dist < self._vert_threshold
-            #         and self.horiz_dist < self._horiz_threshold
-            #         and (self.depth_dist > self._min_depth_threshold
-            #              and self.depth_dist < self._max_depth_dist)):
-            #     done = True
-
-            # If accurate enough then end the episode
-            # if (abs(self.vert_dist) < self._vert_threshold
-            #         and abs(self.horiz_dist) < self._horiz_threshold):
-            #     done = True
+            # Return negative reward based on distances
+            reward -= abs(self.horiz_dist)
+            reward -= abs(self.vert_dist)
 
         return self._get_state(), reward, done
 
@@ -153,25 +134,12 @@ class BaxterEnvironment:
         # Update cartesian coordinates
         pose = self._left_arm.endpoint_pose()
 
-        # x: 0.300(close) to 0.820(far)
-        # y: -0.370 (right) to 0.850(left)
-        # self.x_pos = pose['position'].x
-        # self.y_pos = pose['position'].y
         self.z_pos = pose['position'].z
-        self.x_pos = (2 / 0.52) * (pose['position'].x - 0.820) + 1
-        self.y_pos = (2 / 1.22) * (pose['position'].y - 0.850) + 1
-        # euler = self._get_euler(
-        #     pose['orientation'])
-        # euler = euler_from_quaternion(pose['orientation'])
-        # self.roll_pos = euler[0]
-        # self.pitch_pos = euler[1]
-        # self.yaw_pos = euler[2]
+        self.x_pos = pose['position'].x
+        self.y_pos = pose['position'].y
 
         # Calculate distance to object and distance from centre of camera
         self.horiz_dist, self.vert_dist = self._calc_dist()
-        # self.depth_dist = (self.x_pos - self._obj_x_pos) ** 2
-        # + (self.y_pos - self._obj_y_pos) ** 2
-        # + (self.z_pos - self._obj_z_pos) ** 2
 
     def _calc_dist(self):
         # Define lower and upper colour bounds
@@ -197,11 +165,22 @@ class BaxterEnvironment:
         return x_dist, y_dist
 
     def _get_joint_angles(self, action):
+        def clamp(n, minim, maxim):
+            return max(minim, min(n, maxim))
+
         # Calculate desired endpoint position of arm
         pose = self._left_arm.endpoint_pose()
-        x = pose['position'].x + action[0] * self._x_lim
-        y = pose['position'].y + action[1] * self._y_lim
-        # z = self.z_pos + action[2] * self._z_lim
+        x = pose['position'].x + action[0] * self._x_move_lim
+        y = pose['position'].y + action[1] * self._y_move_lim
+
+        # Clamp values to prevent losing sight of object
+        x = clamp(x, self._obj_x_pos - self._x_dist_lim,
+                  self._obj_x_pos + self._x_dist_lim)
+        y = clamp(y, self._obj_y_pos - self._y_dist_lim,
+                  self._obj_y_pos + self._y_dist_lim)
+
+        # Clamp to prevent gripper being too close to body
+        x = max(x, self._x_pos_min)
 
         # Create pose of desired position
         pose = Pose()
@@ -276,7 +255,7 @@ class BaxterEnvironment:
 
     def _move_block(self):
         # Generate random x and y locations within reachable area
-        x_loc = random.uniform(0.29, 0.68)
+        x_loc = random.uniform(0.40, 0.68)
         y_loc = random.uniform(0.0, 0.38)
 
         # Create ModelState message
