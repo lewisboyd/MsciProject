@@ -34,8 +34,10 @@ class ImageStateDataset(Dataset):
             self.img_dir = self.base_dir + "images/"
         states = torch.load(self.base_dir + "states")[:50000]
         split = states.size(0) - (states.size(0) / 10)
+        self.start_index = 0
         if is_test:
             self.states = states[split:]
+            self.start_index = split - 1
         else:
             self.states = states[:split]
 
@@ -45,7 +47,7 @@ class ImageStateDataset(Dataset):
 
     def __getitem__(self, id):
         """Index dataset to get image and state pair."""
-        img_name = self.img_dir + "img" + str(id) + ".png"
+        img_name = self.img_dir + "img" + str(self.start_index + id) + ".png"
         img = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
@@ -66,7 +68,7 @@ if __name__ == '__main__':
                         help='if true trains using retina images')
     args = parser.parse_args()
 
-    # Set training seed
+    # Set seed
     torch.manual_seed(0)
 
     # Training variables
