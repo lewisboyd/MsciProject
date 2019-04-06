@@ -37,7 +37,7 @@ class ImageStateDataset(Dataset):
         self.start_index = 0
         if is_test:
             self.states = states[split:]
-            self.start_index = split - 1
+            self.start_index = split
         else:
             self.states = states[:split]
 
@@ -48,7 +48,7 @@ class ImageStateDataset(Dataset):
     def __getitem__(self, id):
         """Index dataset to get image and state pair."""
         img_name = self.img_dir + "img" + str(self.start_index + id) + ".png"
-        img = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(img_name)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
         img = torch.tensor(img, dtype=torch.float).unsqueeze(0)
@@ -72,7 +72,6 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Training variables
-    use_retina = False
     max_epoch = 40
     batch_size = 16
     criterion = nn.MSELoss()
@@ -103,9 +102,9 @@ if __name__ == '__main__':
     # Create train and test dataloaders
     train_ds = ImageStateDataset(False, args.use_retina)
     train_dl = DataLoader(train_ds, batch_size, shuffle=True, pin_memory=True,
-                          num_workers=1)
+                          num_workers=0)
     test_ds = ImageStateDataset(True, args.use_retina)
-    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=1)
+    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=0)
 
     start = time.time()
 

@@ -100,7 +100,7 @@ class ResNet10(nn.Module):
         """
         # Create network
         super(ResNet10, self).__init__()
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
                                bias=False)
         self.block1 = BasicBlock(64, 64, 1)
         self.block2 = BasicBlock(64, 128, 2)
