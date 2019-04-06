@@ -23,6 +23,7 @@ class CameraController:
         self.img_size = img_size
         self.bridge = CvBridge()
         self.time = rospy.Time.now()
+        # Set buffer size larger than a single image msg to prevent congestion
         buff_size = int(800 * 1280 * 3 * 1.25)
         rospy.Subscriber(img_topic, Image, self._callback, queue_size=1,
                          buff_size=buff_size)

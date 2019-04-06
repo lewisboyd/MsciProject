@@ -15,9 +15,9 @@ if __name__ == '__main__':
 
     # Variables
     SIZE = 10000
-    STATE_DIM = 2
+    STATE_DIM = 4
     ACTION_DIM = 2
-    MAX_EP_STEPS = SIZE / 100
+    MAX_EP_STEPS = 100
 
     # Create folder to save data
     DATA_FOLDER = (os.path.dirname(

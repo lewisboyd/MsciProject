@@ -5,12 +5,13 @@ import sys
 import cv2
 import rospy
 
-from environment import BaxterEnvironment
+from environment import BaxterEnvironment, Retina
 
 
 def run():
     rospy.init_node("test")
-    env = BaxterEnvironment()
+    env = BaxterEnvironment((1280, 800))
+    retina = Retina(1280, 800)
     env.reset()
     rospy.on_shutdown(env.close)
     cv2.namedWindow("Feed", cv2.WINDOW_NORMAL)
@@ -55,7 +56,7 @@ def run():
                 done = done or (ep_step == 15)
 
         # Display image until key pressed
-        cv2.imshow("Feed", env.image)
+        cv2.imshow("Feed", retina.sample(env.image))
         key = cv2.waitKey(0)
 
         # If 'esc' pressed exit program
