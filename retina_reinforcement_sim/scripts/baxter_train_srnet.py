@@ -49,9 +49,14 @@ class ImageStateDataset(Dataset):
         """Index dataset to get image and state pair."""
         img_name = self.img_dir + "img" + str(self.start_index + id) + ".png"
         img = cv2.imread(img_name)
+        cv2.imshow("before resize", img)
+        img = cv2.resize(img, None, fx=0.7, fy=0.7,
+                         interpolation=cv2.INTER_AREA)
+        cv2.imshow("after resize", img)
+        cv2.waitKey(0)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
-        img = torch.tensor(img, dtype=torch.float).unsqueeze(0)
+        img = torch.tensor(img, dtype=torch.float).permute(2, 0, 1)
         state = self.states[id]
         return(img, state)
 
@@ -73,7 +78,7 @@ if __name__ == '__main__':
 
     # Training variables
     max_epoch = 40
-    batch_size = 16
+    batch_size = 32
     criterion = nn.MSELoss()
     SAVE_FREQ = 5
     RESULTS_FOLDER = (os.path.dirname(
@@ -117,6 +122,7 @@ if __name__ == '__main__':
             for i, batch in enumerate(train_dl):
                 net = net.train()
                 images, targets = batch
+                print images.size()
                 images = images.to(device)
                 targets = targets.to(device)
                 optimiser.zero_grad()
