@@ -32,7 +32,7 @@ class ImageStateDataset(Dataset):
             self.img_dir = self.base_dir + "retina_images/"
         else:
             self.img_dir = self.base_dir + "images/"
-        states = torch.load(self.base_dir + "states")[:50000]
+        states = torch.load(self.base_dir + "states")
         split = states.size(0) - (states.size(0) / 10)
         self.start_index = 0
         if is_test:
@@ -49,11 +49,8 @@ class ImageStateDataset(Dataset):
         """Index dataset to get image and state pair."""
         img_name = self.img_dir + "img" + str(self.start_index + id) + ".png"
         img = cv2.imread(img_name)
-        cv2.imshow("before resize", img)
         img = cv2.resize(img, None, fx=0.7, fy=0.7,
                          interpolation=cv2.INTER_AREA)
-        cv2.imshow("after resize", img)
-        cv2.waitKey(0)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
         img = torch.tensor(img, dtype=torch.float).permute(2, 0, 1)
@@ -77,7 +74,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # Training variables
-    max_epoch = 40
+    max_epoch = 50
     batch_size = 32
     criterion = nn.MSELoss()
     SAVE_FREQ = 5
@@ -107,9 +104,9 @@ if __name__ == '__main__':
     # Create train and test dataloaders
     train_ds = ImageStateDataset(False, args.use_retina)
     train_dl = DataLoader(train_ds, batch_size, shuffle=True, pin_memory=True,
-                          num_workers=0)
+                          num_workers=1)
     test_ds = ImageStateDataset(True, args.use_retina)
-    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=0)
+    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=1)
 
     start = time.time()
 
@@ -122,7 +119,6 @@ if __name__ == '__main__':
             for i, batch in enumerate(train_dl):
                 net = net.train()
                 images, targets = batch
-                print images.size()
                 images = images.to(device)
                 targets = targets.to(device)
                 optimiser.zero_grad()
