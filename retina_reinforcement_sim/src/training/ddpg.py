@@ -43,7 +43,9 @@ class Ddpg:
         self.noise_function = noise_function
         self.noise = init_noise
         self.final_noise = final_noise
-        self.noise_decay = (init_noise - final_noise) / exploration_len
+        self.noise_decay = None
+        if self.noise is not None:
+            self.noise_decay = (init_noise - final_noise) / exploration_len
 
         # Training variables
         self.batch_size = batch_size
@@ -195,7 +197,7 @@ class Ddpg:
 
                 if timestep_t == 0 or timestep_t % eval_t == 0:
                     # Evaluate performance
-                    eval_reward = self._evaluate(
+                    eval_reward, _ = self.evaluate(
                         env, max_ep_steps, eval_ep)
                     validation_rewards.append(eval_reward)
 
@@ -252,7 +254,7 @@ class Ddpg:
         finally:
             try:
                 # Evaluate final performance
-                eval_reward = self._evaluate(env, max_ep_steps, eval_ep)
+                eval_reward, _ = self.evaluate(env, max_ep_steps, eval_ep)
                 validation_rewards.append(eval_reward)
                 print "Final Performance: %0.2f" % eval_reward
             except:
@@ -279,6 +281,36 @@ class Ddpg:
             mins = (end - start) / 60
             print "Training finished after %d hours %d minutes" % (
                 mins / 60, mins % 60)
+
+    def evaluate(self, env, max_steps, eval_episodes):
+        """Evaluates performance on the agent.
+
+        Args:
+            env (object): Environment to run.
+            max_steps (int): Max steps in one episode.
+            eval_episodes (int): Number of episodes to run.
+
+        Returns:
+            mean of episode rewards.
+            std of episode rewards.
+        """
+        ep_rewards = []
+        ep_reward = 0.
+        for _ in range(eval_episodes):
+            state = self.preprocessor(env.reset()).to(self.device)
+            done = False
+            timestep = 0
+            while not done:
+                timestep = timestep + 1
+                action = self._get_exploitation_action(state)
+                next_obs, reward, done = env.step(action.cpu())
+                ep_reward += reward
+                done = done or (timestep == max_steps)
+                state = self.preprocessor(next_obs).to(self.device)
+            ep_rewards.append(ep_reward)
+        mean = np.mean(ep_rewards)
+        std = np.std(ep_rewards)
+        return mean, std
 
     def _optimise(self):
         # Sample memory
@@ -336,22 +368,6 @@ class Ddpg:
         if done:
             return torch.tensor([0], dtype=torch.float).to(self.device)
         return torch.tensor([1], dtype=torch.float).to(self.device)
-
-    def _evaluate(self, env, max_steps, eval_episodes):
-        # Average multiple episode rewards
-        avg_reward = 0.
-        for _ in range(eval_episodes):
-            state = self.preprocessor(env.reset()).to(self.device)
-            done = False
-            timestep = 0
-            while not done:
-                timestep = timestep + 1
-                action = self._get_exploitation_action(state)
-                next_obs, reward, done = env.step(action.cpu())
-                avg_reward += reward
-                done = done or (timestep == max_steps)
-                state = self.preprocessor(next_obs).to(self.device)
-        return avg_reward / eval_episodes
 
     def _get_exploitation_action(self, state):
         with torch.no_grad():
