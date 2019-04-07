@@ -30,8 +30,15 @@ from camera_controller import CameraController
 class BaxterEnvironment:
     """Class representing the learning environment."""
 
-    def __init__(self, img_size=(256, 160)):
-        """Initialise environment."""
+    def __init__(self, img_size=(256, 160), img_observation=False):
+        """Initialise environment.
+
+        Args:
+            img_size (int tuple): (width, height) of image to return.
+            img_observation (bool): If true returns observation as dictionary
+                                    containing img and state(euler coordinates).
+                                    Otherwise returns observation as n array.
+        """
         # Enable baxter and initialise environment
         baxter_interface.RobotEnable().enable()
         self._left_cam = CameraController("/cameras/left_hand_camera/image",
@@ -125,6 +132,8 @@ class BaxterEnvironment:
         self._delete_gazebo_models()
 
     def _get_state(self):
+        if self.img_observation:
+            return {'img': self.image, 'state': [self.x_pos, self.y_pos]}
         return [self.horiz_dist, self.vert_dist, self.x_pos, self.y_pos]
 
     def _update_state(self):

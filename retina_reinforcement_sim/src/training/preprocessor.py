@@ -1,4 +1,5 @@
 import cPickle as pickle
+import cv2
 import numpy as np
 import torch
 import torchvision.transforms as T
@@ -6,6 +7,7 @@ import torchvision.transforms as T
 import cortex
 import cortex_cuda
 import retina_cuda
+from environment import Retina
 
 
 class PendulumPreprocessor:
@@ -26,6 +28,59 @@ class BaxterPreprocessor:
         if None in obs:
             return torch.tensor([0, 0, 0, 0], dtype=torch.float)
         return torch.tensor(obs, dtype=torch.float)
+
+
+class BaxterImagePreprocessor:
+    """Class to preprocess Baxter env observation before use by DDPG agent."""
+
+    def __init__(self, srnet):
+        """Initialise.
+
+        Args:
+            srnet (object): Network to process image input.
+        """
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.srnet = srnet.to(self.device)
+
+    def __call__(self, obs):
+        """Finds object in image then returns complete state tensor."""
+        img = obs['img']
+        state = torch.tensor(obs['state'], dtype=torch.float)
+        img = cv2.resize(img, None, fx=0.7, fy=0.7,
+                         interpolation=cv2.INTER_AREA)
+        # Convert to float and rescale to [0,1]
+        img = img.astype(np.float32) / 255
+        img = torch.tensor(img, dtype=torch.float, device=device).permute(2, 0, 1)
+        obj_loc = self.srnet(img).cpu()
+        state = torch.cat(obj_loc, state)
+        return state
+
+
+class BaxterRetinaPreprocessor:
+    """Class to preprocess Baxter env observation before use by DDPG agent."""
+
+    def __init__(self, srnet):
+        """Initialise.
+
+        Args:
+            srnet (object): Network to process image input."""
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.srnet = srnet.to(self.device)
+        self.retina = Retina(1280, 800)
+
+    def __call__(self, obs):
+        """Finds object in cortical image then returns complete state tensor."""
+        img = obs['img']
+        state = torch.tensor(obs['state'], dtype=torch.float)
+        img = self.retina(img)
+        img = cv2.resize(img, None, fx=0.7, fy=0.7,
+                         interpolation=cv2.INTER_AREA)
+        # Convert to float and rescale to [0,1]
+        img = img.astype(np.float32) / 255
+        img = torch.tensor(img, dtype=torch.float, device=device).permute(2, 0, 1)
+        obj_loc = self.srnet(img).cpu()
+        state = torch.cat(obj_loc, state)
+        return state
 
 
 class ImagePreprocessor:

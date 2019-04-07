@@ -37,7 +37,9 @@ class Ddpg:
             r_normalizer (object): Function to normalize rewards
         """
         # Experience Replay
-        self.memory = ReplayMemory(memory_capacity)
+        self.memory = None
+        if memory_capacity is not None:
+            self.memory = ReplayMemory(memory_capacity)
 
         # Noise function and variables
         self.noise_function = noise_function
@@ -115,7 +117,7 @@ class Ddpg:
 
         if checkpoint:
             # Reload from checkpoint
-            self._load(model_folder, checkpoint)
+            self.load_checkpoint(model_folder, checkpoint)
 
         if init_explore > 0:
             # Prepopulate experience replay using noise function
@@ -399,13 +401,18 @@ class Ddpg:
         if self.s_normalizer:
             self.s_normalizer.save(path + id)
 
-    def _load(self, path, checkpoint):
-        self.actor.load_state_dict(torch.load(path + checkpoint + "_actor"))
+    def load_checkpoint(self, path, checkpoint):
+        """Loads weights and running mean/std from checkpoint.
+
+        Args:
+            path (string): Path to model data.
+            checkpoint (int): """
+        self.actor.load_state_dict(torch.load(path + str(checkpoint) + "_actor"))
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.critic.load_state_dict(torch.load(path + checkpoint + "_critic"))
+        self.critic.load_state_dict(torch.load(path + str(checkpoint) + "_critic"))
         self.critic_target.load_state_dict(self.critic.state_dict())
         if self.s_normalizer:
-            self.s_normalizer.load(path + checkpoint)
+            self.s_normalizer.load(path + str(checkpoint))
 
     def _soft_update(self, target, source):
         for target_param, param in zip(target.parameters(),
