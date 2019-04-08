@@ -69,7 +69,7 @@ if __name__ == '__main__':
     rospy.init_node("evaluation process")
 
     # Evaluation variables
-    EVAL_EP = 250
+    EVAL_EP = 500
     MAX_STEPS = 5
 
     # Agent variables

@@ -300,11 +300,11 @@ class Ddpg:
 
         """
         ep_rewards = []
-        ep_reward = 0.
         for _ in range(eval_episodes):
             state = self.preprocessor(env.reset()).to(self.device)
             done = False
             timestep = 0
+            ep_reward = 0.
             while not done:
                 timestep = timestep + 1
                 action = self._get_exploitation_action(state)
