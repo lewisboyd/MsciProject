@@ -38,21 +38,27 @@ class BaxterImagePreprocessor:
 
         Args:
             srnet (object): Network to process image input.
+
         """
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.srnet = srnet.to(self.device)
 
     def __call__(self, obs):
-        """Finds object in image then returns complete state tensor."""
+        """Find object in image then returns complete state tensor."""
         img = obs['img']
         state = torch.tensor(obs['state'], dtype=torch.float)
+        img = cv2.resize(img, (468, 246),
+                         interpolation=cv2.INTER_AREA)
         img = cv2.resize(img, None, fx=0.7, fy=0.7,
                          interpolation=cv2.INTER_AREA)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
-        img = torch.tensor(img, dtype=torch.float, device=device).permute(2, 0, 1)
-        obj_loc = self.srnet(img).cpu()
-        state = torch.cat(obj_loc, state)
+        img = torch.tensor(img, dtype=torch.float,
+                           device=self.device).permute(2, 0, 1).unsqueeze(0)
+        with torch.no_grad():
+            obj_loc = self.srnet(img).cpu()
+        state = torch.cat((obj_loc[0], state))
         return state
 
 
@@ -63,23 +69,28 @@ class BaxterRetinaPreprocessor:
         """Initialise.
 
         Args:
-            srnet (object): Network to process image input."""
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            srnet (object): Network to process image input.
+
+        """
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.srnet = srnet.to(self.device)
         self.retina = Retina(1280, 800)
 
     def __call__(self, obs):
-        """Finds object in cortical image then returns complete state tensor."""
+        """Find object in cortical image then returns complete state tensor."""
         img = obs['img']
         state = torch.tensor(obs['state'], dtype=torch.float)
-        img = self.retina(img)
+        img = self.retina.sample(img)
         img = cv2.resize(img, None, fx=0.7, fy=0.7,
                          interpolation=cv2.INTER_AREA)
         # Convert to float and rescale to [0,1]
         img = img.astype(np.float32) / 255
-        img = torch.tensor(img, dtype=torch.float, device=device).permute(2, 0, 1)
-        obj_loc = self.srnet(img).cpu()
-        state = torch.cat(obj_loc, state)
+        img = torch.tensor(img, dtype=torch.float,
+                           device=self.device).permute(2, 0, 1).unsqueeze(0)
+        with torch.no_grad():
+            obj_loc = self.srnet(img).cpu()
+        state = torch.cat((obj_loc[0], state))
         return state
 
 

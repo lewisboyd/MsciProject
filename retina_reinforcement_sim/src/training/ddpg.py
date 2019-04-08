@@ -96,6 +96,7 @@ class Ddpg:
                              evaluation.
             eval_ep (int): How many episodes to run for evaluation.
             checkpoint (int): Checkpoint to restart training from
+
         """
         start = time.time()
 
@@ -285,16 +286,18 @@ class Ddpg:
                 mins / 60, mins % 60)
 
     def evaluate(self, env, max_steps, eval_episodes):
-        """Evaluates performance on the agent.
+        """Evaluate performance of the agent.
 
         Args:
             env (object): Environment to run.
             max_steps (int): Max steps in one episode.
             eval_episodes (int): Number of episodes to run.
 
+
         Returns:
             mean of episode rewards.
             std of episode rewards.
+
         """
         ep_rewards = []
         ep_reward = 0.
@@ -407,9 +410,11 @@ class Ddpg:
         Args:
             path (string): Path to model data.
             checkpoint (int): """
-        self.actor.load_state_dict(torch.load(path + str(checkpoint) + "_actor"))
+        self.actor.load_state_dict(torch.load(
+            path + str(checkpoint) + "_actor"))
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.critic.load_state_dict(torch.load(path + str(checkpoint) + "_critic"))
+        self.critic.load_state_dict(torch.load(
+            path + str(checkpoint) + "_critic"))
         self.critic_target.load_state_dict(self.critic.state_dict())
         if self.s_normalizer:
             self.s_normalizer.load(path + str(checkpoint))

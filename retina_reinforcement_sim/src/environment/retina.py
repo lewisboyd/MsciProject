@@ -17,7 +17,7 @@ class Retina:
             width (int): width of image
         """
         # Load in data
-        retina_path = '/home/lewis/Downloads/RetinaCUDA-master/Retinas'
+        retina_path = '/home/lewis/RetinaCUDA-master/Retinas'
         with open(retina_path + '/ret50k_loc.pkl', 'rb') as handle:
             loc50k = pickle.load(handle)
         with open(retina_path + '/ret50k_coeff.pkl', 'rb') as handle:

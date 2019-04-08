@@ -53,6 +53,7 @@ class BaxterEnvironment:
         rospy.wait_for_service(ns, 5.0)
 
         # Observation information
+        self.img_observation = img_observation
         self.image = None
         self.img_size = img_size
         self.x_pos = None
