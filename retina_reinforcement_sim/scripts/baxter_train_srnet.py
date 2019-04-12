@@ -13,7 +13,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Dataset, DataLoader
 
-from model import ResNet10
+from model import ResNet10, ResNet6
 
 
 class ImageStateDataset(Dataset):
@@ -33,11 +33,11 @@ class ImageStateDataset(Dataset):
         else:
             self.img_dir = self.base_dir + "images/"
         states = torch.load(self.base_dir + "states")
-        split = states.size(0) - (states.size(0) / 10)
+        split = states.size(0) - (states.size(0) / 5)
         self.start_index = 0
         if is_test:
             self.states = states[split:]
-            self.start_index = split
+            self.start_index = split - 1
         else:
             self.states = states[:split]
 
@@ -68,10 +68,26 @@ if __name__ == '__main__':
         description='Train State Representation Net.')
     parser.add_argument('--use-retina', type=str2bool, default=False,
                         help='if true trains using retina images')
+    parser.add_argument('--depth', type=int, default=10,
+                        help='depth of ResNet (choice between 6 and 10)')
     args = parser.parse_args()
 
     # Set seed
     torch.manual_seed(0)
+
+    # Init network
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if args.depth == 10:
+        net = ResNet10(2).to(device)
+    elif args.depth == 6:
+        net = ResNet6(2).to(device)
+    else:
+        print "Depth of %d is invalid, available options are [6, 10]" % (
+            args.depth)
+    optimiser = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
+                          weight_decay=0.0001)
+    scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=5,
+                                  min_lr=0.0001)
 
     # Training variables
     max_epoch = 50
@@ -83,17 +99,15 @@ if __name__ == '__main__':
     MODEL_FOLDER = (os.path.dirname(os.path.realpath(__file__))
                     + "/baxter_center/")
     if args.use_retina:
-        RESULTS_FOLDER = RESULTS_FOLDER + "sr_retina/results/"
-        MODEL_FOLDER = MODEL_FOLDER + "sr_retina/state_dicts/"
+        RESULTS_FOLDER = (RESULTS_FOLDER + "sr_retina_"
+                          + str(args.depth) + "/results/")
+        MODEL_FOLDER = (MODEL_FOLDER + "sr_retina_"
+                        + str(args.depth) + "/state_dicts/")
     else:
-        RESULTS_FOLDER = RESULTS_FOLDER + "sr/results/"
-        MODEL_FOLDER = MODEL_FOLDER + "sr/state_dicts/"
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    net = ResNet10(2).to(device)
-    optimiser = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
-                          weight_decay=0.0001)
-    scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=5,
-                                  min_lr=0.0001)
+        RESULTS_FOLDER = (RESULTS_FOLDER + "sr_"
+                          + str(args.depth) + "/results/")
+        MODEL_FOLDER = (MODEL_FOLDER + "sr_"
+                        + str(args.depth) + "/state_dicts/")
 
     # Create folders if don't exist
     if not os.path.isdir(RESULTS_FOLDER):
@@ -104,9 +118,10 @@ if __name__ == '__main__':
     # Create train and test dataloaders
     train_ds = ImageStateDataset(False, args.use_retina)
     train_dl = DataLoader(train_ds, batch_size, shuffle=True, pin_memory=True,
-                          num_workers=1)
+                          num_workers=1, drop_last=True)
     test_ds = ImageStateDataset(True, args.use_retina)
-    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=1)
+    test_dl = DataLoader(test_ds, batch_size, pin_memory=True, num_workers=1,
+                         drop_last=True)
 
     start = time.time()
 
@@ -115,9 +130,9 @@ if __name__ == '__main__':
         epoch_test_losses = []
         for epoch in range(1, max_epoch + 1):
             # Train
+            net = net.train()
             train_losses = []
             for i, batch in enumerate(train_dl):
-                net = net.train()
                 images, targets = batch
                 images = images.to(device)
                 targets = targets.to(device)
@@ -129,10 +144,10 @@ if __name__ == '__main__':
                 train_losses.append(loss.detach().cpu().numpy())
 
             # Test
+            net = net.eval()
             test_losses = []
             with torch.no_grad():
                 for i, batch in enumerate(test_dl):
-                    net = net.eval()
                     images, targets = batch
                     images = images.to(device)
                     targets = targets.to(device)

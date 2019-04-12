@@ -43,6 +43,7 @@ class BaxterImagePreprocessor:
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
         self.srnet = srnet.to(self.device)
+        self.srnet = self.srnet.eval()
 
     def __call__(self, obs):
         """Find object in image then returns complete state tensor."""
@@ -57,8 +58,8 @@ class BaxterImagePreprocessor:
         img = torch.tensor(img, dtype=torch.float,
                            device=self.device).permute(2, 0, 1).unsqueeze(0)
         with torch.no_grad():
-            obj_loc = self.srnet(img).cpu()
-        state = torch.cat((obj_loc[0], state))
+            sr = self.srnet(img).cpu()
+        state = torch.cat((sr[0], state))
         return state
 
 

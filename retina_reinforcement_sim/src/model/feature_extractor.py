@@ -132,3 +132,44 @@ class ResNet10(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         return self.fc1(x).tanh()
+
+
+class ResNet6(nn.Module):
+    """6 Layer ResNet (307K params) using full preactivion."""
+
+    def __init__(self, state_dim):
+        """Initialise layers.
+
+        Args:
+            state_dim (int): Number of values to regress
+        """
+        # Create network
+        super(ResNet6, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
+                               bias=False)
+        self.block1 = BasicBlock(64, 64, 1)
+        self.block2 = BasicBlock(64, 128, 2)
+        self.bn1 = nn.BatchNorm2d(128)
+        self.relu = nn.ReLU(inplace=True)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Linear(128, state_dim)
+
+    def forward(self, batch):
+        """Generate predictions for batch of images.
+
+        Args:
+            batch (float tensor): Batch of images.
+
+        Returns:
+            float tensor : Batch of predictions.
+        """
+        x = self.conv1(batch)
+
+        x = self.block1(x)
+        x = self.block2(x)
+
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        return self.fc1(x).tanh()
