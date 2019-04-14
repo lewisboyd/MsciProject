@@ -66,12 +66,11 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(outplanes)
         self.conv2 = nn.Conv2d(outplanes, outplanes, kernel_size=3,
                                stride=1, padding=1, bias=False)
-        self.downsample = nn.Sequential()
-        if stride != 1:
-            self.downsample = nn.Sequential(
+        self.shortcut = nn.Sequential()
+        if inplanes != outplanes or stride != 1:
+            self.shortcut = nn.Sequential(
                 nn.Conv2d(inplanes, outplanes, kernel_size=1, stride=stride,
-                          bias=False),
-                nn.BatchNorm2d(outplanes)
+                          bias=False)
             )
 
     def forward(self, x):
@@ -84,7 +83,7 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
         out = self.conv2(out)
 
-        out += self.downsample(x)
+        out += self.shortcut(x)
 
         return out
 
@@ -153,6 +152,47 @@ class ResNet6(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc1 = nn.Linear(128, state_dim)
+
+    def forward(self, batch):
+        """Generate predictions for batch of images.
+
+        Args:
+            batch (float tensor): Batch of images.
+
+        Returns:
+            float tensor : Batch of predictions.
+        """
+        x = self.conv1(batch)
+
+        x = self.block1(x)
+        x = self.block2(x)
+
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        return self.fc1(x).tanh()
+
+
+class WRN6_2(nn.Module):
+    """6 Layer ResNet (73k params) using full preactivion."""
+
+    def __init__(self, state_dim):
+        """Initialise layers.
+
+        Args:
+            state_dim (int): Number of values to regress
+        """
+        # Create network
+        super(WRN6_2, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1,
+                               bias=False)
+        self.block1 = BasicBlock(16, 32, 1)
+        self.block2 = BasicBlock(32, 64, 2)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Linear(64, state_dim)
 
     def forward(self, batch):
         """Generate predictions for batch of images.

@@ -13,7 +13,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Dataset, DataLoader
 
-from model import ResNet10, ResNet6
+from model import ResNet10, ResNet6, WRN6_2
 
 
 class ImageStateDataset(Dataset):
@@ -63,13 +63,18 @@ def str2bool(value):
     return value.lower() == 'true'
 
 
+def lower(value):
+    """Returns lowercase string"""
+    return value.lower()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Train State Representation Net.')
-    parser.add_argument('--use-retina', type=str2bool, default=False,
+    parser.add_argument('--use-retina', type=str2bool, required=True,
                         help='if true trains using retina images')
-    parser.add_argument('--depth', type=int, default=10,
-                        help='depth of ResNet (choice between 6 and 10)')
+    parser.add_argument('--network', type=lower, required=True,
+                        help='[ResNet6, ResNet10, WRN6_2]')
     args = parser.parse_args()
 
     # Set seed
@@ -77,16 +82,19 @@ if __name__ == '__main__':
 
     # Init network
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if args.depth == 10:
+    if args.network == "resnet10":
         net = ResNet10(2).to(device)
-    elif args.depth == 6:
+    elif args.network == "resnet6":
         net = ResNet6(2).to(device)
+    elif args.network == "wrn6_2":
+        net = WRN6_2(2).to(device)
     else:
-        print "Depth of %d is invalid, available options are [6, 10]" % (
-            args.depth)
+        print "%s is not a valid network, choices are " % (
+            args.network, "[ResNet6, ResNet10, WRN6_2]")
+        exit()
     optimiser = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
                           weight_decay=0.0001)
-    scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=5,
+    scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=10,
                                   min_lr=0.0001)
 
     # Training variables
@@ -94,20 +102,17 @@ if __name__ == '__main__':
     batch_size = 32
     criterion = nn.MSELoss()
     SAVE_FREQ = 5
+
+    # Create save paths
     RESULTS_FOLDER = (os.path.dirname(
         os.path.realpath(__file__)) + "/baxter_center/")
-    MODEL_FOLDER = (os.path.dirname(os.path.realpath(__file__))
-                    + "/baxter_center/")
+    MODEL_FOLDER = (os.path.dirname(
+        os.path.realpath(__file__)) + "/baxter_center/")
     if args.use_retina:
-        RESULTS_FOLDER = (RESULTS_FOLDER + "sr_retina_"
-                          + str(args.depth) + "/results/")
-        MODEL_FOLDER = (MODEL_FOLDER + "sr_retina_"
-                        + str(args.depth) + "/state_dicts/")
-    else:
-        RESULTS_FOLDER = (RESULTS_FOLDER + "sr_"
-                          + str(args.depth) + "/results/")
-        MODEL_FOLDER = (MODEL_FOLDER + "sr_"
-                        + str(args.depth) + "/state_dicts/")
+        RESULTS_FOLDER = RESULTS_FOLDER + "retina_"
+        MODEL_FOLDER = MODEL_FOLDER + "retina_"
+    RESULTS_FOLDER = (RESULTS_FOLDER + args.network + "/results/")
+    MODEL_FOLDER = (MODEL_FOLDER + args.network + "/state_dicts/")
 
     # Create folders if don't exist
     if not os.path.isdir(RESULTS_FOLDER):

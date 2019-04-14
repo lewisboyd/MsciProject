@@ -9,8 +9,8 @@ import torch.nn as nn
 import numpy as np
 
 from environment import BaxterEnvironment
-from model import (ActorMlp, CriticMlp, ResNet6, ResNet10)
-from training import (Ddpg, BaxterImagePreprocessor,
+from model import ActorMlp, CriticMlp, ResNet6, ResNet10, WRN6_2
+from training import (Ddpg, BaxterImagePreprocessor, BaxterRetinaPreprocessor,
                       NormalActionNoise, Normalizer)
 
 
@@ -22,7 +22,27 @@ class Flatten(nn.Module):
         return x.view(x.size()[0], -1)
 
 
+def str2bool(value):
+    """Convert string to boolean."""
+    return value.lower() == 'true'
+
+
+def lower(value):
+    """Returns lowercase string"""
+    return value.lower()
+
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Train State Representation Net.')
+    parser.add_argument('--network', type=lower, required=True,
+                        help='[ResNet6, ResNet10, WRN6_2]')
+    parser.add_argument('--use-retina', type=str2bool, required=True,
+                        help='if true trains using retina images')
+    parser.add_argument('--epoch', type=int, default=50,
+                        help='epoch of network to load')
+    args = parser.parse_args()
+
     rospy.init_node("training process")
 
     # Set seeds
@@ -32,16 +52,37 @@ if __name__ == '__main__':
     random.seed(15)
 
     # Instansiate resnet in eval mode
-    resnet = ResNet6(2).cuda().eval()
+    if args.network == "resnet6":
+        resnet = ResNet6(2)
+        features = 128
+    elif args.network == "resnet10":
+        resnet = ResNet10(2)
+        features = 512
+    elif args.network == "wrn6_2":
+        resnet = WRN6_2(2)
+        features = 64
+    else:
+        print "%s is not a valid network, choices are " % (
+            args.network, "[ResNet6, ResNet10, WRN6_2]")
+        exit()
+    resnet = resnet.cuda().eval()
+
+    # Load state dictionary
     state_dict = (os.path.dirname(os.path.realpath(__file__))
-                  + "/baxter_center/sr_retina_6/state_dicts/net_50")
+                  + "/baxter_center/")
+    if args.use_retina:
+        state_dict = state_dict + "retina_"
+    state_dict = (state_dict + args.network + "/state_dict/" + "net_"
+                  + str(args.epoch))
     resnet.load_state_dict(torch.load(state_dict))
+
+    # Remove final layer
     layers = list(resnet.children())[:-1]
     layers.append(Flatten())
     resnet = nn.Sequential(*layers)
 
     # Environment variables
-    STATE_DIM = 128 + 2
+    STATE_DIM = features + 2
     ACTION_DIM = 2
 
     # Training variables
@@ -54,15 +95,20 @@ if __name__ == '__main__':
             + "/baxter_center/data/")
     DATA = None
     MODEL = (os.path.dirname(os.path.realpath(__file__))
-             + "/baxter_center/mlp_retina_128vector/state_dicts/")
+             + "/baxter_center/mlp_")
     RESULT = (os.path.dirname(os.path.realpath(__file__))
-              + "/baxter_center/mlp_retina_128vector/results/")
+              + "/baxter_center/mlp_")
+    if args.use_retina:
+        MODEL = MODEL + "retina_"
+        RESULT = RESULT + "retina_"
+    MODEL = MODEL + str(features) + "vector/state_dicts/"
+    RESULT = RESULT + str(features) + "vector/results/"
     EVAL_FREQ = 2000
     EVAL_EP = 20
     CHECKPOINT = None
 
     # Agent variables
-    REPLAY_SIZE = 500000
+    REPLAY_SIZE = 150000
     BATCH_SIZE = 128
     NOISE_FUNCTION = NormalActionNoise(actions=ACTION_DIM)
     INIT_NOISE = 1.0
@@ -74,7 +120,10 @@ if __name__ == '__main__':
     CRITIC = CriticMlp(STATE_DIM, ACTION_DIM).cuda()
     CRITIC_OPTIM = torch.optim.Adam(
         CRITIC.parameters(), 0.001, weight_decay=0.01)
-    PREPROCESSOR = BaxterImagePreprocessor(resnet)
+    if args.use_retina:
+        PREPROCESSOR = BaxterRetinaPreprocessor(resnet)
+    else:
+        PREPROCESSOR = BaxterImagePreprocessor(resnet)
     S_NORMALIZER = Normalizer(STATE_DIM)
     R_NORMALIZER = None
 
