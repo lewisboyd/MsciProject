@@ -9,7 +9,7 @@ import torch.nn as nn
 import numpy as np
 
 from environment import BaxterEnvironment
-from model import ActorMlp, CriticMlp, ResNet6, ResNet10, WRN6_2
+from model import ActorMlp, CriticMlp, ResNet6, ResNet10, WRN64, WRN128
 from training import (Ddpg, BaxterImagePreprocessor, BaxterRetinaPreprocessor,
                       NormalActionNoise, Normalizer)
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Train State Representation Net.')
     parser.add_argument('--network', type=lower, required=True,
-                        help='[ResNet6, ResNet10, WRN6_2]')
+                        help='[ResNet6, ResNet10, WRN64, WRN128]')
     parser.add_argument('--use-retina', type=str2bool, required=True,
                         help='if true trains using retina images')
     parser.add_argument('--epoch', type=int, default=50,
@@ -58,12 +58,15 @@ if __name__ == '__main__':
     elif args.network == "resnet10":
         resnet = ResNet10(2)
         features = 512
-    elif args.network == "wrn6_2":
-        resnet = WRN6_2(2)
+    elif args.network == "wrn64":
+        resnet = WRN64(2)
         features = 64
+    elif args.network == "wrn128":
+        resnet = WRN128(2)
+        features = 128
     else:
         print "%s is not a valid network, choices are " % (
-            args.network, "[ResNet6, ResNet10, WRN6_2]")
+            args.network, "[ResNet6, ResNet10, WRN64, WRN128]")
         exit()
     resnet = resnet.cuda().eval()
 

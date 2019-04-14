@@ -13,7 +13,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Dataset, DataLoader
 
-from model import ResNet10, ResNet6, WRN6_2
+from model import ResNet10, ResNet6, WRN64, WRN128
 
 
 class ImageStateDataset(Dataset):
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--use-retina', type=str2bool, required=True,
                         help='if true trains using retina images')
     parser.add_argument('--network', type=lower, required=True,
-                        help='[ResNet6, ResNet10, WRN6_2]')
+                        help='[ResNet6, ResNet10, WRN64, WRN128]')
     args = parser.parse_args()
 
     # Set seed
@@ -86,16 +86,18 @@ if __name__ == '__main__':
         net = ResNet10(2).to(device)
     elif args.network == "resnet6":
         net = ResNet6(2).to(device)
-    elif args.network == "wrn6_2":
-        net = WRN6_2(2).to(device)
+    elif args.network == "wrn64":
+        net = WRN64(2).to(device)
+    elif args.network == "wrn128":
+        net = WRN128(2).to(device)
     else:
         print "%s is not a valid network, choices are " % (
-            args.network, "[ResNet6, ResNet10, WRN6_2]")
+            args.network, "[ResNet6, ResNet10, WRN64, WRN128]")
         exit()
     optimiser = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
                           weight_decay=0.0001)
     scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=10,
-                                  min_lr=0.0001)
+                                  min_lr=0.00001)
 
     # Training variables
     max_epoch = 50
