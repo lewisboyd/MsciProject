@@ -37,7 +37,7 @@ class ImageStateDataset(Dataset):
         self.start_index = 0
         if is_test:
             self.states = states[split:]
-            self.start_index = split - 1
+            self.start_index = split
         else:
             self.states = states[:split]
 
