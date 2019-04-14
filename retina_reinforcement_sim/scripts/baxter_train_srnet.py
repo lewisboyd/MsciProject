@@ -94,8 +94,8 @@ if __name__ == '__main__':
         print "%s is not a valid network, choices are " % (
             args.network, "[ResNet6, ResNet10, WRN64, WRN128]")
         exit()
-    optimiser = optim.SGD(net.parameters(), lr=0.1, momentum=0.9,
-                          weight_decay=0.0001)
+    optimiser = optim.SGD(net.parameters(), lr=0.01, momentum=0.9,
+                          weight_decay=0.00001)
     scheduler = ReduceLROnPlateau(optimiser, 'min', factor=0.1, patience=10,
                                   min_lr=0.00001)
 
