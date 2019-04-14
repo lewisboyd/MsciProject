@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import random
 
@@ -11,14 +12,18 @@ import numpy as np
 from environment import BaxterEnvironment
 from model import ActorMlp, CriticMlp, ResNet6, ResNet10, WRN64, WRN128
 from training import (Ddpg, BaxterImagePreprocessor, BaxterRetinaPreprocessor,
-                      NormalActionNoise, Normalizer)
+                      NormalActionNoise, FeatureNormalizer)
 
 
 class Flatten(nn.Module):
+    """Flattening layer."""
+
     def __init__(self):
+        """Initialise empty module."""
         super(Flatten, self).__init__()
 
     def forward(self, x):
+        """Flatten each batch."""
         return x.view(x.size()[0], -1)
 
 
@@ -28,7 +33,7 @@ def str2bool(value):
 
 
 def lower(value):
-    """Returns lowercase string"""
+    """Return lowercase string."""
     return value.lower()
 
 
@@ -75,11 +80,11 @@ if __name__ == '__main__':
                   + "/baxter_center/")
     if args.use_retina:
         state_dict = state_dict + "retina_"
-    state_dict = (state_dict + args.network + "/state_dict/" + "net_"
+    state_dict = (state_dict + args.network + "/state_dicts/net_"
                   + str(args.epoch))
     resnet.load_state_dict(torch.load(state_dict))
 
-    # Remove final layer
+    # Replace final layer with flatten layer
     layers = list(resnet.children())[:-1]
     layers.append(Flatten())
     resnet = nn.Sequential(*layers)
@@ -90,8 +95,8 @@ if __name__ == '__main__':
 
     # Training variables
     ENVIRONMENT = BaxterEnvironment((1280, 800), True)
-    INIT_EXPLORE = 10000
-    MAX_STEPS = 300000
+    INIT_EXPLORE = 2000
+    MAX_STEPS = 100000
     MAX_EP_STEPS = 15
     UPDATES_PER_STEP = 1
     DATA = (os.path.dirname(os.path.realpath(__file__))
@@ -111,7 +116,7 @@ if __name__ == '__main__':
     CHECKPOINT = None
 
     # Agent variables
-    REPLAY_SIZE = 150000
+    REPLAY_SIZE = 100000
     BATCH_SIZE = 128
     NOISE_FUNCTION = NormalActionNoise(actions=ACTION_DIM)
     INIT_NOISE = 1.0
@@ -127,7 +132,7 @@ if __name__ == '__main__':
         PREPROCESSOR = BaxterRetinaPreprocessor(resnet)
     else:
         PREPROCESSOR = BaxterImagePreprocessor(resnet)
-    S_NORMALIZER = Normalizer(STATE_DIM)
+    S_NORMALIZER = FeatureNormalizer(2)
     R_NORMALIZER = None
 
     # Train agent

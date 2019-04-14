@@ -180,20 +180,20 @@ if __name__ == '__main__':
                 torch.save(net.state_dict(), MODEL_FOLDER
                            + "net_" + str(epoch))
     finally:
-        # Plot training results
-        plt.figure()
-        plt.plot(range(1, max_epoch + 1), epoch_train_losses)
-        plt.plot(range(1, max_epoch + 1), epoch_test_losses)
-        plt.legend(['Train loss', 'Test Loss'], loc='upper right')
-
         # Save results
-        plt.savefig(RESULTS_FOLDER + "training_performance.png")
         np.save(RESULTS_FOLDER + "train_loss", epoch_train_losses)
         np.save(RESULTS_FOLDER + "test_loss", epoch_test_losses)
 
         # Save model
         torch.save(net.state_dict(), MODEL_FOLDER
                    + "net_" + str(epoch))
+
+        # Save training plot
+        plt.figure()
+        plt.plot(range(1, max_epoch + 1), epoch_train_losses)
+        plt.plot(range(1, max_epoch + 1), epoch_test_losses)
+        plt.legend(['Train loss', 'Test Loss'], loc='upper right')
+        plt.savefig(RESULTS_FOLDER + "training_performance.png")
 
         end = time.time()
         mins = (end - start) / 60
