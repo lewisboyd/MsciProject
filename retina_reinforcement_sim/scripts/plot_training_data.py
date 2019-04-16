@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 
 import sys
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from environment import BaxterEnvironment
-from model import (ActorMlp, CriticMlp)
-from training import (Ddpg, BaxterPreprocessor, NormalActionNoise)
 
 
 if __name__ == '__main__':
@@ -44,7 +39,7 @@ if __name__ == '__main__':
 
     else:
         # Set common titles
-        fig, ax = plt.subplots(len(folders)+1, 3)
+        fig, ax = plt.subplots(len(folders) + 1, 3)
         ax[0, 0].set_title("Evaluation rewards")
         ax[0, 1].set_title("Critic loss")
         ax[0, 2].set_title("Actor loss")
