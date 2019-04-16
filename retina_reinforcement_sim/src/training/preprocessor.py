@@ -66,31 +66,62 @@ class BaxterImagePreprocessor:
 class BaxterRetinaPreprocessor:
     """Class to preprocess Baxter env observation before use by DDPG agent."""
 
-    def __init__(self, srnet):
+    def __init__(self, srnet, visualise=False, display_centre=False):
         """Initialise.
 
         Args:
             srnet (object): Network to process image input.
+            visualise (bool): If true displays retina image until keypress
+            display_centre (bool): If true displays image with predicted centre
+                                   until keypress
 
         """
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
         self.srnet = srnet.to(self.device)
         self.retina = Retina(1280, 800)
+        self.visualise = visualise
+        if visualise:
+            cv2.namedWindow("Retina", cv2.WINDOW_NORMAL)
+        self.display_centre = display_centre
+        if display_centre:
+            cv2.namedWindow("Centre", cv2.WINDOW_NORMAL)
 
     def __call__(self, obs):
         """Find object in cortical image then returns complete state tensor."""
         img = obs['img']
         state = torch.tensor(obs['state'], dtype=torch.float)
-        img = self.retina.sample(img)
-        img = cv2.resize(img, None, fx=0.7, fy=0.7,
-                         interpolation=cv2.INTER_AREA)
-        # Convert to float and rescale to [0,1]
-        img = img.astype(np.float32) / 255
-        img = torch.tensor(img, dtype=torch.float,
-                           device=self.device).permute(2, 0, 1).unsqueeze(0)
+        ret_img = self.retina.sample(img)
+
+        # Display retina image
+        if self.visualise:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            cv2.imshow("Retina", ret_img)
+
+        # Preprocess and run through srnet
+        ret_img = cv2.resize(ret_img, None, fx=0.7, fy=0.7,
+                             interpolation=cv2.INTER_AREA)
+        ret_img = img.astype(np.float32) / 255
+        ret_img = torch.tensor(img, dtype=torch.float,
+                               device=self.device).permute(2, 0, 1).unsqueeze(0)
         with torch.no_grad():
             obj_loc = self.srnet(img).cpu()
+
+        # Display predicted centre on image
+        if self.display_centre:
+            loc = obj_loc[0] + 1
+            loc[0] = loc[0] * (img.shape[1] / 2)
+            loc[1] = loc[1] * (img.shape[0] / 2)
+            img = cv2.circle(img, loc, 5, (0, 255, 0), -1)
+            if not self.visualise:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            cv2.imshow("Centre", img)
+
+        # Display images
+        if self.visualise or self.display_centre:
+            cv2.waitKey(0)
+
+        # Concatenate state and return
         state = torch.cat((obj_loc[0], state))
         return state
 

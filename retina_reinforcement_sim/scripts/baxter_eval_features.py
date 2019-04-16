@@ -6,12 +6,25 @@ import random
 
 import numpy as np
 import torch
+import torch.nn as nn
 import rospy
 
 from training import (BaxterPreprocessor, BaxterImagePreprocessor,
-                      BaxterRetinaPreprocessor, Normalizer, Ddpg)
+                      BaxterRetinaPreprocessor, FeatureNormalizer, Ddpg)
 from model import ActorMlp, CriticMlp, ResNet6, ResNet10, WRN64, WRN128
 from environment import BaxterEnvironment
+
+
+class Flatten(nn.Module):
+    """Flattening layer."""
+
+    def __init__(self):
+        """Initialise empty module."""
+        super(Flatten, self).__init__()
+
+    def forward(self, x):
+        """Flatten each batch."""
+        return x.view(x.size()[0], -1)
 
 
 def str2bool(value):
@@ -27,9 +40,9 @@ def lower(value):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Evaluate dynamics agent performance.')
-    parser.add_argument('--network', type=lower, default=None,
+    parser.add_argument('--network', type=lower, required=True,
                         help='[ResNet6, ResNet10, WRN64, WRN128]')
-    parser.add_argument('--use-retina', type=str2bool,
+    parser.add_argument('--use-retina', type=str2bool, required=True,
                         help='if true trains using retina images')
     parser.add_argument('--epoch', type=int, default=50,
                         help='epoch of network to load')
@@ -48,31 +61,40 @@ if __name__ == '__main__':
     MAX_STEPS = args.steps
 
     # Load resnet if not using dynamics
-    if args.network is not None:
-        if args.network == "resnet6":
-            resnet = ResNet6(2)
-        elif args.network == "resnet10":
-            resnet = ResNet10(2)
-        elif args.network == "wrn64":
-            resnet = WRN64(2)
-        elif args.network == "wrn128":
-            resnet = WRN128(2)
-        else:
-            print "%s is not a valid network, choices are " % (
-                args.network, "[ResNet6, ResNet10, WRN64, WRN128]")
-            exit()
-        resnet = resnet.cuda().eval()
+    if args.network == "resnet6":
+        resnet = ResNet6(2)
+        features = 128
+    elif args.network == "resnet10":
+        resnet = ResNet10(2)
+        features = 512
+    elif args.network == "wrn64":
+        resnet = WRN64(2)
+        features = 64
+    elif args.network == "wrn128":
+        resnet = WRN128(2)
+        features = 128
+    else:
+        print "%s is not a valid network, choices are " % (
+            args.network, "[ResNet6, ResNet10, WRN64, WRN128]")
+        exit()
+    resnet = resnet.cuda().eval()
 
-        # Load state dictionary
-        state_dict = (os.path.dirname(os.path.realpath(__file__))
-                      + "/baxter_center/")
-        if args.use_retina:
-            state_dict = state_dict + "retina_"
-        state_dict = (state_dict + args.network + "/state_dicts/net_"
-                      + str(args.epoch))
-        resnet.load_state_dict(torch.load(state_dict))
+    # Load state dictionary
+    state_dict = (os.path.dirname(os.path.realpath(__file__))
+                  + "/baxter_center/")
+    if args.use_retina:
+        state_dict = state_dict + "retina_"
+    state_dict = (state_dict + args.network + "/state_dicts/net_"
+                  + str(args.epoch))
+    resnet.load_state_dict(torch.load(state_dict))
+
+    # Replace final layer with flatten layer
+    layers = list(resnet.children())[:-1]
+    layers.append(Flatten())
+    resnet = nn.Sequential(*layers)
 
     # Agent variables
+    STATE_DIM = features + 2
     REPLAY_SIZE = None
     BATCH_SIZE = None
     NOISE_FUNCTION = None
@@ -80,24 +102,19 @@ if __name__ == '__main__':
     FINAL_NOISE = None
     EXPLORATION_LEN = None
     REWARD_SCALE = None
-    ACTOR = ActorMlp(4, 2).cuda()
+    ACTOR = ActorMlp(STATE_DIM, 2).cuda()
     ACTOR_OPTIM = None
-    CRITIC = CriticMlp(4, 2).cuda()
+    CRITIC = CriticMlp(STATE_DIM, 2).cuda()
     CRITIC_OPTIM = None
-    if args.network is not None:
-        if args.use_retina:
-            PREPROCESSOR = BaxterRetinaPreprocessor(
-                resnet, args.visualise, args.visualise)
-        else:
-            PREPROCESSOR = BaxterImagePreprocessor(
-                resnet, args.visualise, args.visualise)
+    if args.use_retina:
+        PREPROCESSOR = BaxterRetinaPreprocessor(resnet, args.visualise)
     else:
-        PREPROCESSOR = BaxterPreprocessor(resnet)
-    S_NORMALIZER = Normalizer(4)
+        PREPROCESSOR = BaxterImagePreprocessor(resnet, args.visualise)
+    S_NORMALIZER = FeatureNormalizer(2)
     R_NORMALIZER = None
     MODEL_FOLDER = (os.path.dirname(os.path.realpath(__file__))
                     + "/baxter_center/mlp_normRs/state_dicts/")
-    CHECKPOINT = 300000
+    CHECKPOINT = 100000
 
     # Load agent from checkpoint
     agent = Ddpg(REPLAY_SIZE, BATCH_SIZE, NOISE_FUNCTION, INIT_NOISE,
